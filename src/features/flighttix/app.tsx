@@ -16,6 +16,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   type Ticket as FlightTicket,
+  type IdentusDebugLogEntry,
   identusStatusLabels,
   type Passport,
 } from "@/features/identus/types";
@@ -89,6 +90,8 @@ export function FlightTixApp() {
         </div>
       )}
 
+      <DebugPane app={app} />
+
       {app.activeModal === "register" && <RegisterModal app={app} />}
       {app.activeModal === "profile" && <ProfileModal app={app} />}
     </main>
@@ -127,6 +130,7 @@ function LoadingScreen({ app }: { app: FlightTixController }) {
           <span>Tear Down and Stop</span>
         </button>
       </div>
+      <DebugPane app={app} />
       <p className="flighttix-version">Identus SDK: v8.0.0</p>
     </main>
   );
@@ -291,6 +295,83 @@ function DevPanel({ app }: { app: FlightTixController }) {
   );
 }
 
+function DebugPane({ app }: { app: FlightTixController }) {
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const log = logRef.current;
+    if (log) {
+      log.scrollTop = log.scrollHeight;
+    }
+  });
+
+  const snapshot = app.snapshot;
+  const identifiers = [
+    {
+      label: "Wallet",
+      value: identusStatusLabels[snapshot.status],
+    },
+    { label: "Connection", value: snapshot.connectionId },
+    { label: "Issuer DID", value: snapshot.issuerDID },
+    { label: "Passport schema", value: snapshot.passportSchemaGuid },
+    { label: "Ticket schema", value: snapshot.ticketSchemaGuid },
+    { label: "Last event", value: snapshot.lastEvent },
+  ];
+
+  return (
+    <section className="flighttix-debug-pane" aria-label="Identus debug trace">
+      <div className="flighttix-debug-header">
+        <div>
+          <h2>Debug Trace</h2>
+          <p>In-session Identus and app events</p>
+        </div>
+        <span
+          className={`flighttix-debug-badge ${snapshot.debugEvent?.level ?? "info"}`}
+        >
+          {snapshot.debugEvent?.level ?? "info"}
+        </span>
+      </div>
+
+      <dl className="flighttix-debug-identifiers">
+        {identifiers.map((item) => (
+          <div key={item.label}>
+            <dt>{item.label}</dt>
+            <dd title={item.value ?? undefined}>
+              {formatDebugValue(item.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <div
+        aria-live="polite"
+        aria-relevant="additions"
+        className="flighttix-debug-log"
+        ref={logRef}
+        role="log"
+      >
+        {app.debugLog.length === 0 ? (
+          <p className="flighttix-debug-empty">Waiting for app events...</p>
+        ) : (
+          app.debugLog.map((entry) => (
+            <DebugLogRow entry={entry} key={entry.id} />
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DebugLogRow({ entry }: { entry: IdentusDebugLogEntry }) {
+  return (
+    <div className={`flighttix-debug-entry ${entry.level}`}>
+      <time dateTime={entry.timestamp}>{formatLogTime(entry.timestamp)}</time>
+      <span>{entry.level}</span>
+      <p>{entry.message}</p>
+    </div>
+  );
+}
+
 function RegisterModal({ app }: { app: FlightTixController }) {
   const [name, setName] = useState("");
   const [passportNumber, setPassportNumber] = useState("");
@@ -422,5 +503,31 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeZone: "UTC",
+  }).format(date);
+}
+
+function formatDebugValue(value?: string): string {
+  return value ? shortenIdentifier(value) : "Not set";
+}
+
+function shortenIdentifier(value: string): string {
+  if (value.length <= 34) {
+    return value;
+  }
+
+  return `${value.slice(0, 18)}...${value.slice(-10)}`;
+}
+
+function formatLogTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    second: "2-digit",
   }).format(date);
 }

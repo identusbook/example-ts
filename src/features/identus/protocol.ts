@@ -9,7 +9,7 @@ type RequestPresentation =
 
 type FlightTixProtocolMessage =
   | { kind: "offer"; message: OfferCredential; thid?: string }
-  | { kind: "issue"; message: IssueCredential }
+  | { kind: "issue"; message: IssueCredential; thid?: string }
   | { kind: "presentationRequest"; message: RequestPresentation }
   | { kind: "ignored" };
 
@@ -34,6 +34,7 @@ export async function decodeFlightTixProtocolMessage(
     return {
       kind: "issue",
       message: IssueCredential.fromMessage(message),
+      thid: message.thid,
     };
   }
 

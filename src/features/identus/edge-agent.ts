@@ -47,6 +47,7 @@ import {
 } from "./storage";
 import type {
   FlightTixWallet,
+  IdentusDebugLevel,
   IdentusSnapshot,
   IdentusStatus,
   Passport,
@@ -63,6 +64,21 @@ const issuerDidPollLimit = 120;
 const issuerDidPollDelayMs = 1000;
 const connectionPollLimit = 60;
 const connectionPollDelayMs = 1000;
+const statusDebugLabels: Record<IdentusStatus, string> = {
+  disconnected: "Wallet disconnected",
+  startingAgent: "Starting browser wallet agent",
+  startingDIDCommMessageListener: "Starting DIDComm message listener",
+  creatingConnectionToCloudAgent: "Connecting to Cloud Agent",
+  issuerDIDAlreadyExists: "Issuer DID already exists",
+  creatingIssuerDID: "Creating issuer DID",
+  publishingIssuerDID: "Publishing issuer DID",
+  issuerDIDPublished: "Issuer DID published",
+  checkingPassportSchema: "Checking passport schema",
+  creatingPassportSchema: "Creating passport schema",
+  createdPassportSchema: "Passport schema created",
+  ready: "Wallet ready",
+  error: "Wallet error",
+};
 
 export class BrowserFlightTixWallet implements FlightTixWallet {
   private sdk?: IdentusSdk;
@@ -84,7 +100,9 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     try {
       this.setStatus("startingAgent");
       this.config = await getPublicConfig();
+      this.setEvent("FlightTix config loaded");
       const mediator = await getMediator();
+      this.setEvent("Mediator configuration loaded");
       const sdk = await this.loadSdk();
       const apollo = new sdk.Apollo();
       const seed = this.getOrCreateSeed(apollo);
@@ -145,7 +163,9 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     await this.stop().catch(() => undefined);
     await clearWalletStorage(config.walletDbName);
     this.processedMessageIds.clear();
-    this.setStatus("disconnected");
+    if (this.snapshot.status !== "disconnected") {
+      this.setStatus("disconnected");
+    }
   }
 
   async isLoggedIn(): Promise<boolean> {
@@ -182,6 +202,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     });
     writeStorage(walletStorageKeys.passportVCThid, record.thid);
     deleteStorage(walletStorageKeys.authValid);
+    this.setEvent("Passport credential offer requested");
   }
 
   async issueTicket(flight: Flight): Promise<void> {
@@ -203,6 +224,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
       },
     });
     writeStorage(walletStorageKeys.ticketVCThid, record.thid);
+    this.setEvent("Ticket credential offer requested");
   }
 
   async requestProof(kind: CredentialKind): Promise<void> {
@@ -306,9 +328,11 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     );
 
     if (existing) {
+      this.setEvent("Reusing Cloud Agent connection");
       return this.waitForCloudAgentConnectionReady(existing.connectionId);
     }
 
+    this.setEvent("Creating Cloud Agent connection");
     const connection = await createConnection();
     const invitationUrl = connection.invitation?.invitationUrl;
     const agent = this.requireAgent();
@@ -321,6 +345,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
 
     const invitation = await agent.parseOOBInvitation(new URL(invitationUrl));
     await agent.acceptInvitation(invitation);
+    this.setEvent("Cloud Agent invitation accepted");
     writeStorage(
       walletStorageKeys.cloudAgentConnectionId,
       connection.connectionId,
@@ -339,6 +364,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
       );
 
       if (connection?.state === cloudAgentConnectionReadyState) {
+        this.setEvent("Cloud Agent connection ready");
         return connectionId;
       }
 
@@ -351,6 +377,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
   private async ensureIssuerDID(): Promise<string> {
     const stored = readStorage(walletStorageKeys.cloudAgentIssuerDID);
     if (stored) {
+      this.setEvent("Reusing stored issuer DID");
       return this.ensureDIDPublished(stored);
     }
 
@@ -364,6 +391,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
 
     this.setStatus("creatingIssuerDID");
     const created = await createIssuerDid();
+    this.setEvent("Issuer DID created");
     const resolved = await getDid(created.longFormDid);
     writeStorage(walletStorageKeys.cloudAgentIssuerDID, resolved.did);
     return this.ensureDIDPublished(resolved.did);
@@ -400,11 +428,18 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     const existingGuid = readStorage(storageKey);
 
     if (existingGuid) {
+      this.setEvent(`${schemaLabel(kind)} schema check started`);
       try {
         await getSchema(existingGuid);
+        this.setEvent(
+          `${schemaLabel(kind)} schema reused`,
+          "info",
+          schemaSnapshotPatch(kind, existingGuid),
+        );
         return existingGuid;
       } catch {
         deleteStorage(storageKey);
+        this.setEvent(`${schemaLabel(kind)} stored schema was stale`);
       }
     }
 
@@ -417,9 +452,17 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     const registeredSchemaGuid = await this.findRegisteredSchema(kind, author);
     if (registeredSchemaGuid) {
       writeStorage(storageKey, registeredSchemaGuid);
+      this.setEvent(
+        `${schemaLabel(kind)} schema reused`,
+        "info",
+        schemaSnapshotPatch(kind, registeredSchemaGuid),
+      );
       return registeredSchemaGuid;
     }
 
+    if (kind === "ticket") {
+      this.setEvent("Creating ticket schema");
+    }
     const schema = await createSchema(kind, author);
     writeStorage(storageKey, schema.guid);
 
@@ -427,6 +470,12 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
       this.setStatus("createdPassportSchema", {
         passportSchemaGuid: schema.guid,
       });
+    } else {
+      this.setEvent(
+        "Ticket schema created",
+        "info",
+        schemaSnapshotPatch(kind, schema.guid),
+      );
     }
 
     return schema.guid;
@@ -492,20 +541,26 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
             break;
           }
 
+          this.setEvent(
+            `${credentialLabelFromThread(protocolMessage.thid)} credential offer accepted`,
+          );
           const request = await agent.prepareRequestCredentialWithIssuer(
             protocolMessage.message,
           );
           await agent.send(request.makeMessage());
-          this.setEvent("Credential offer accepted");
           break;
         }
         case "issue": {
           await agent.processIssuedCredentialMessage(protocolMessage.message);
           deleteStorage(walletStorageKeys.authValid);
-          this.setEvent("Credential stored");
+          this.setEvent(
+            `${credentialLabelFromThread(protocolMessage.thid)} credential stored`,
+            "success",
+          );
           break;
         }
         case "presentationRequest": {
+          this.setEvent("Presentation request received");
           try {
             const credential = await this.findCredentialForPresentation(
               protocolMessage.message,
@@ -517,9 +572,12 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
                   credential,
                 );
               await agent.send(presentation.makeMessage());
-              this.setEvent("Presentation sent");
+              this.setEvent("Presentation sent", "success");
             } else {
-              this.setEvent("No matching credential for presentation request");
+              this.setEvent(
+                "No matching credential for presentation request",
+                "warning",
+              );
             }
           } finally {
             deleteStorage(walletStorageKeys.pendingProofKind);
@@ -607,9 +665,16 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
   private setStatus(
     status: IdentusStatus,
     patch: Partial<IdentusSnapshot> = {},
+    level: IdentusDebugLevel = status === "error" ? "error" : "info",
   ): void {
+    const message =
+      status === "error" && patch.error
+        ? patch.error
+        : statusDebugLabels[status];
+    const debugEvent = { level, message };
+
     if (status === "disconnected") {
-      this.snapshot = { ...patch, status };
+      this.snapshot = { ...patch, debugEvent, lastEvent: message, status };
       this.onSnapshot(this.snapshot);
       return;
     }
@@ -617,14 +682,25 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     this.snapshot = {
       ...this.snapshot,
       ...patch,
+      debugEvent,
       status,
       error: status === "error" ? patch.error : undefined,
+      lastEvent: message,
     };
     this.onSnapshot(this.snapshot);
   }
 
-  private setEvent(lastEvent: string): void {
-    this.snapshot = { ...this.snapshot, lastEvent };
+  private setEvent(
+    lastEvent: string,
+    level: IdentusDebugLevel = "info",
+    patch: Partial<IdentusSnapshot> = {},
+  ): void {
+    this.snapshot = {
+      ...this.snapshot,
+      ...patch,
+      debugEvent: { level, message: lastEvent },
+      lastEvent,
+    };
     this.onSnapshot(this.snapshot);
   }
 }
@@ -645,6 +721,31 @@ function schemaStorageKeyForKind(kind: CredentialKind) {
   return kind === "ticket"
     ? walletStorageKeys.ticketSchemaGuid
     : walletStorageKeys.passportSchemaGuid;
+}
+
+function schemaLabel(kind: CredentialKind): string {
+  return kind === "ticket" ? "Ticket" : "Passport";
+}
+
+function credentialLabelFromThread(thid?: string): string {
+  if (thid === readStorage(walletStorageKeys.passportVCThid)) {
+    return "Passport";
+  }
+
+  if (thid === readStorage(walletStorageKeys.ticketVCThid)) {
+    return "Ticket";
+  }
+
+  return "Credential";
+}
+
+function schemaSnapshotPatch(
+  kind: CredentialKind,
+  schemaGuid: string,
+): Partial<IdentusSnapshot> {
+  return kind === "ticket"
+    ? { ticketSchemaGuid: schemaGuid }
+    : { passportSchemaGuid: schemaGuid };
 }
 
 function presentationRequestContainsSchema(

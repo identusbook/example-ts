@@ -35,10 +35,23 @@ export const identusStatusLabels: Record<IdentusStatus, string> = {
   error: "Error",
 };
 
+export type IdentusDebugLevel = "info" | "success" | "warning" | "error";
+
+export interface IdentusDebugEvent {
+  level: IdentusDebugLevel;
+  message: string;
+}
+
+export interface IdentusDebugLogEntry extends IdentusDebugEvent {
+  id: number;
+  timestamp: string;
+}
+
 export interface IdentusSnapshot {
   status: IdentusStatus;
   error?: string;
   connectionId?: string;
+  debugEvent?: IdentusDebugEvent;
   issuerDID?: string;
   passportSchemaGuid?: string;
   ticketSchemaGuid?: string;

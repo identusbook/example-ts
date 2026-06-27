@@ -5,6 +5,8 @@ import { getFlights } from "@/features/identus/api";
 import { BrowserFlightTixWallet } from "@/features/identus/edge-agent";
 import type {
   FlightTixWallet,
+  IdentusDebugLevel,
+  IdentusDebugLogEntry,
   IdentusSnapshot,
   Passport,
   RegistrationInput,
@@ -38,6 +40,7 @@ export interface FlightTixController {
   activeModal?: FlightTixModal;
   activeTab: FlightTixTab;
   busyAction?: BusyAction;
+  debugLog: IdentusDebugLogEntry[];
   error?: string;
   flights: Flight[];
   message?: string;
@@ -75,11 +78,65 @@ const sampleTicket: Flight = {
   price: 700,
 };
 
+const maxDebugLogEntries = 200;
+const actionTrace: Record<BusyAction, { start: string; success: string }> = {
+  startup: {
+    start: "Startup requested",
+    success: "Startup completed",
+  },
+  register: {
+    start: "Passport registration submitted",
+    success: "Passport registration completed",
+  },
+  purchase: {
+    start: "Ticket purchase requested",
+    success: "Ticket purchase completed",
+  },
+  securityProof: {
+    start: "Airport ticket proof requested",
+    success: "Airport ticket proof completed",
+  },
+  reset: {
+    start: "Wallet reset requested",
+    success: "Wallet reset completed",
+  },
+  stop: {
+    start: "Wallet stop requested",
+    success: "Wallet stopped",
+  },
+  issuePassport: {
+    start: "Sample passport issuance requested",
+    success: "Sample passport issuance completed",
+  },
+  issueTicket: {
+    start: "Sample ticket issuance requested",
+    success: "Sample ticket issuance completed",
+  },
+  passportProof: {
+    start: "Passport proof requested",
+    success: "Passport proof completed",
+  },
+  ticketProof: {
+    start: "Ticket proof requested",
+    success: "Ticket proof completed",
+  },
+};
+
+const tabLabels: Record<FlightTixTab, string> = {
+  purchase: "Purchase",
+  ticket: "Ticket",
+  security: "Airport Security",
+  dev: "Dev Utils",
+};
+
 export function useFlightTixApp(): FlightTixController {
+  const debugEntryIdRef = useRef(0);
+  const mountedRef = useRef(false);
   const walletRef = useRef<FlightTixWallet | undefined>(undefined);
   const [activeModal, setActiveModal] = useState<FlightTixModal>();
   const [activeTab, setActiveTab] = useState<FlightTixTab>("purchase");
   const [busyAction, setBusyAction] = useState<BusyAction>();
+  const [debugLog, setDebugLog] = useState<IdentusDebugLogEntry[]>([]);
   const [error, setError] = useState<string>();
   const [flights, setFlights] = useState<Flight[]>([]);
   const [message, setMessage] = useState<string>();
@@ -97,13 +154,45 @@ export function useFlightTixApp(): FlightTixController {
     [flights, selectedFlightId],
   );
 
+  const appendDebugLog = useCallback(
+    (level: IdentusDebugLevel, message: string) => {
+      debugEntryIdRef.current += 1;
+      const entry: IdentusDebugLogEntry = {
+        id: debugEntryIdRef.current,
+        level,
+        message,
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugLog((current) => [...current, entry].slice(-maxDebugLogEntries));
+    },
+    [],
+  );
+
+  const handleSnapshot = useCallback(
+    (nextSnapshot: IdentusSnapshot) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setSnapshot(nextSnapshot);
+      if (nextSnapshot.debugEvent) {
+        appendDebugLog(
+          nextSnapshot.debugEvent.level,
+          nextSnapshot.debugEvent.message,
+        );
+      }
+    },
+    [appendDebugLog],
+  );
+
   const wallet = useCallback((): FlightTixWallet => {
     if (!walletRef.current) {
-      walletRef.current = new BrowserFlightTixWallet(setSnapshot);
+      walletRef.current = new BrowserFlightTixWallet(handleSnapshot);
     }
 
     return walletRef.current;
-  }, []);
+  }, [handleSnapshot]);
 
   const refreshWalletData = useCallback(async () => {
     const currentWallet = wallet();
@@ -126,21 +215,24 @@ export function useFlightTixApp(): FlightTixController {
 
   const runAction = useCallback(
     async (action: BusyAction, task: () => Promise<void>) => {
+      appendDebugLog("info", actionTrace[action].start);
       setBusyAction(action);
       setError(undefined);
       setMessage(undefined);
 
       try {
         await task();
+        appendDebugLog("success", actionTrace[action].success);
       } catch (caught) {
         const nextError =
           caught instanceof Error ? caught.message : "FlightTix action failed";
         setError(nextError);
+        appendDebugLog("error", nextError);
       } finally {
         setBusyAction(undefined);
       }
     },
-    [],
+    [appendDebugLog],
   );
 
   const startWallet = useCallback(async () => {
@@ -164,6 +256,7 @@ export function useFlightTixApp(): FlightTixController {
 
   useEffect(() => {
     let mounted = true;
+    mountedRef.current = true;
 
     startWallet().finally(() => {
       if (!mounted) {
@@ -173,6 +266,7 @@ export function useFlightTixApp(): FlightTixController {
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
       walletRef.current?.stop().catch(() => undefined);
     };
   }, [startWallet]);
@@ -180,10 +274,25 @@ export function useFlightTixApp(): FlightTixController {
   const selectTab = useCallback(
     async (tab: FlightTixTab) => {
       setActiveTab(tab);
+      appendDebugLog("info", `Tab changed to ${tabLabels[tab]}`);
       await refreshWalletData();
       await showRegisterIfNeeded();
     },
-    [refreshWalletData, showRegisterIfNeeded],
+    [appendDebugLog, refreshWalletData, showRegisterIfNeeded],
+  );
+
+  const selectFlight = useCallback(
+    (flightId: string) => {
+      const flight = flights.find((candidate) => candidate.id === flightId);
+      setSelectedFlightId(flightId);
+      appendDebugLog(
+        "info",
+        flight
+          ? `Flight selected ${flight.departure} to ${flight.arrival}`
+          : `Flight selected ${flightId}`,
+      );
+    },
+    [appendDebugLog, flights],
   );
 
   const openProfile = useCallback(async () => {
@@ -201,7 +310,10 @@ export function useFlightTixApp(): FlightTixController {
       const trimmedPassportNumber = input.passportNumber.trim();
 
       if (trimmedName.length <= 1 || trimmedPassportNumber.length <= 1) {
-        setError("Name and Passport Number must be longer than 1 character.");
+        const nextError =
+          "Name and Passport Number must be longer than 1 character.";
+        setError(nextError);
+        appendDebugLog("error", nextError);
         return;
       }
 
@@ -224,12 +336,14 @@ export function useFlightTixApp(): FlightTixController {
         setMessage("Passport credential stored");
       });
     },
-    [runAction, wallet],
+    [appendDebugLog, runAction, wallet],
   );
 
   const purchaseTicket = useCallback(async () => {
     if (!selectedFlight) {
-      setError("No flight selected.");
+      const nextError = "No flight selected.";
+      setError(nextError);
+      appendDebugLog("error", nextError);
       return;
     }
 
@@ -242,7 +356,7 @@ export function useFlightTixApp(): FlightTixController {
       setTicket(issuedTicket);
       setMessage("Ticket credential stored");
     });
-  }, [runAction, selectedFlight, wallet]);
+  }, [appendDebugLog, runAction, selectedFlight, wallet]);
 
   const requestTicketProof = useCallback(async () => {
     await runAction("securityProof", async () => {
@@ -311,9 +425,10 @@ export function useFlightTixApp(): FlightTixController {
     activeModal,
     activeTab,
     busyAction,
+    debugLog,
     error,
     flights,
-    message: message ?? snapshot.lastEvent,
+    message,
     passport,
     selectedFlight,
     selectedFlightId,
@@ -329,7 +444,7 @@ export function useFlightTixApp(): FlightTixController {
     requestPassportProof,
     requestTicketProof,
     resetWallet,
-    selectFlight: setSelectedFlightId,
+    selectFlight,
     selectTab,
     startWallet,
     stopWallet,
