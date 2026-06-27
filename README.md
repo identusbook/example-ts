@@ -39,10 +39,12 @@ IDENTUS_MEDIATOR_VERSION=1.2.1
 IDENTUS_CLOUD_AGENT_PORT=8000
 IDENTUS_MEDIATOR_PORT=8080
 IDENTUS_MEDIATOR_MONGO_PORT=27017
+IDENTUS_MEDIATOR_PUBLIC_HOST=192.168.1.25
 IDENTUS_MEDIATOR_SERVICE_ENDPOINTS="http://localhost:8080;ws://localhost:8080/ws"
+CLOUD_AGENT_SCHEMA_BASE_URL=http://192.168.1.25:8000/cloud-agent
 ```
 
-The example defaults to a single Cloud Agent. The Cloud Agent schema URL must be reachable from inside the Cloud Agent container; `.env.example` uses `http://host.docker.internal:8000/cloud-agent` for that purpose.
+The example defaults to a single Cloud Agent. The mediator DID service endpoints and the Cloud Agent schema URL must be reachable from inside the Cloud Agent container. On Linux, `host.docker.internal` may not resolve; use the host LAN IP or another host-reachable address for `IDENTUS_MEDIATOR_PUBLIC_HOST` and `CLOUD_AGENT_SCHEMA_BASE_URL`.
 
 Stop local services:
 

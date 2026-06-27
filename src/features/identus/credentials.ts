@@ -16,9 +16,9 @@ export function claimsFromCredential(
 
   for (const claim of credential.claims) {
     if ("name" in claim && "value" in claim) {
-      claims[String(claim.name)] = claim.value;
+      claims[String(claim.name)] = normalizeClaimValue(claim.value);
     } else {
-      Object.assign(claims, claim);
+      Object.assign(claims, claimsFromFlatRecord(claim));
     }
   }
 
@@ -122,21 +122,46 @@ function claimsFromUnknown(value: unknown): Record<string, unknown> {
   }
 
   const record = value as Record<string, unknown>;
+  const values = record.values;
   const vc = record.vc;
   const credentialSubject = record.credentialSubject;
 
+  if (values && typeof values === "object") {
+    return claimsFromFlatRecord(values as Record<string, unknown>);
+  }
+
   if (credentialSubject && typeof credentialSubject === "object") {
-    return credentialSubject as Record<string, unknown>;
+    return claimsFromFlatRecord(credentialSubject as Record<string, unknown>);
   }
 
   if (vc && typeof vc === "object") {
     const vcSubject = (vc as Record<string, unknown>).credentialSubject;
     if (vcSubject && typeof vcSubject === "object") {
-      return vcSubject as Record<string, unknown>;
+      return claimsFromFlatRecord(vcSubject as Record<string, unknown>);
     }
   }
 
   return {};
+}
+
+function claimsFromFlatRecord(
+  record: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      normalizeClaimValue(value),
+    ]),
+  );
+}
+
+function normalizeClaimValue(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  return "raw" in record ? record.raw : value;
 }
 
 function parseMaybeJson(value: unknown): unknown {

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const guid = new URL(request.url).searchParams.get("guid");
 
     if (!guid) {
-      throw new RouteInputError("Expected guid query parameter");
+      return cloudAgentClient().getSchemas();
     }
 
     return cloudAgentClient().getSchema(guid);

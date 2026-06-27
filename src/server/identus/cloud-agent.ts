@@ -71,6 +71,13 @@ export interface CredentialSchemaResponse extends CredentialSchemaInput {
   self?: string;
 }
 
+export interface CredentialSchemaPage {
+  contents: CredentialSchemaResponse[];
+  kind: string;
+  self: string;
+  pageOf: string;
+}
+
 export interface IssueCredentialRecord {
   recordId: string;
   thid: string;
@@ -190,6 +197,10 @@ export class CloudAgentClient {
 
   async getSchema(guid: string): Promise<CredentialSchemaResponse> {
     return this.request(`/schema-registry/schemas/${encodeURIComponent(guid)}`);
+  }
+
+  async getSchemas(): Promise<CredentialSchemaPage> {
+    return this.request("/schema-registry/schemas");
   }
 
   async createCredentialOffer(

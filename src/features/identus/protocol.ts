@@ -1,9 +1,11 @@
-import {
-  IssueCredential,
-  OfferCredential,
-} from "@hyperledger/identus-sdk/plugins/didcomm";
-import { RequestPresentation } from "@hyperledger/identus-sdk/plugins/oea";
 import type { DidcommMessage } from "./sdk-types";
+
+type OfferCredential =
+  import("@hyperledger/identus-sdk/plugins/didcomm").OfferCredential;
+type IssueCredential =
+  import("@hyperledger/identus-sdk/plugins/didcomm").IssueCredential;
+type RequestPresentation =
+  import("@hyperledger/identus-sdk/plugins/oea").RequestPresentation;
 
 type FlightTixProtocolMessage =
   | { kind: "offer"; message: OfferCredential; thid?: string }
@@ -11,9 +13,15 @@ type FlightTixProtocolMessage =
   | { kind: "presentationRequest"; message: RequestPresentation }
   | { kind: "ignored" };
 
-export function decodeFlightTixProtocolMessage(
+export async function decodeFlightTixProtocolMessage(
   message: DidcommMessage,
-): FlightTixProtocolMessage {
+): Promise<FlightTixProtocolMessage> {
+  const [{ IssueCredential, OfferCredential }, { RequestPresentation }] =
+    await Promise.all([
+      import("@hyperledger/identus-sdk/plugins/didcomm"),
+      import("@hyperledger/identus-sdk/plugins/oea"),
+    ]);
+
   if (message.piuri === OfferCredential.type) {
     return {
       kind: "offer",

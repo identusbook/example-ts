@@ -1,5 +1,6 @@
 import type {
   CredentialKind,
+  Flight,
   JsonObject,
   PassportClaims,
   TicketClaims,
@@ -7,6 +8,7 @@ import type {
 import type {
   ConnectionRecord,
   ConnectionsPage,
+  CredentialSchemaPage,
   CredentialSchemaResponse,
   IssueCredentialRecord,
   ManagedDid,
@@ -25,6 +27,10 @@ export interface PublicFlightTixConfig {
 
 export async function getPublicConfig(): Promise<PublicFlightTixConfig> {
   return apiJson("/api/flighttix/config");
+}
+
+export async function getFlights(): Promise<Flight[]> {
+  return apiJson("/api/flighttix/flights");
 }
 
 export async function getMediator(): Promise<MediatorInfo> {
@@ -72,6 +78,10 @@ export async function getSchema(
   return apiJson(
     `/api/flighttix/cloud-agent/schemas?guid=${encodeURIComponent(guid)}`,
   );
+}
+
+export async function getSchemas(): Promise<CredentialSchemaPage> {
+  return apiJson("/api/flighttix/cloud-agent/schemas");
 }
 
 export async function createSchema(

@@ -14,6 +14,7 @@ import {
   getMediator,
   getPublicConfig,
   getSchema,
+  getSchemas,
   type PublicFlightTixConfig,
   publishDid,
 } from "./api";
@@ -55,8 +56,11 @@ import type {
 } from "./types";
 
 const didStatusPublished = "PUBLISHED";
+const cloudAgentConnectionReadyState = "ConnectionResponseSent";
 const issuerDidPollLimit = 120;
 const issuerDidPollDelayMs = 1000;
+const connectionPollLimit = 60;
+const connectionPollDelayMs = 1000;
 
 export class BrowserFlightTixWallet implements FlightTixWallet {
   private sdk?: IdentusSdk;
@@ -85,6 +89,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
       const pluto = await sdk.Pluto.create({
         dbName: this.config.walletDbName,
         keyRestoration: apollo,
+        startOptions: { storageType: sdk.StorageType.IndexDB },
       });
       const agent = sdk.Agent.initialize({
         apollo,
@@ -202,6 +207,9 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     const connectionId = await this.requireConnectionId();
     const issuerDID = await this.requirePublishedIssuerDID();
     const schemaGuid = await this.ensureSchema(kind);
+    this.setEvent(
+      `${kind === "ticket" ? "Ticket" : "Passport"} proof requested`,
+    );
     await createPresentation({ connectionId, issuerDID, schemaGuid });
   }
 
@@ -295,7 +303,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     );
 
     if (existing) {
-      return existing.connectionId;
+      return this.waitForCloudAgentConnectionReady(existing.connectionId);
     }
 
     const connection = await createConnection();
@@ -315,7 +323,26 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
       connection.connectionId,
     );
 
-    return connection.connectionId;
+    return this.waitForCloudAgentConnectionReady(connection.connectionId);
+  }
+
+  private async waitForCloudAgentConnectionReady(
+    connectionId: string,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < connectionPollLimit; attempt += 1) {
+      const connections = await getConnections();
+      const connection = connections.contents.find(
+        (candidate) => candidate.connectionId === connectionId,
+      );
+
+      if (connection?.state === cloudAgentConnectionReadyState) {
+        return connectionId;
+      }
+
+      await delay(connectionPollDelayMs);
+    }
+
+    throw new Error("Cloud Agent connection did not become ready");
   }
 
   private async ensureIssuerDID(): Promise<string> {
@@ -384,6 +411,12 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     }
 
     const author = await this.requirePublishedIssuerDID();
+    const registeredSchemaGuid = await this.findRegisteredSchema(kind, author);
+    if (registeredSchemaGuid) {
+      writeStorage(storageKey, registeredSchemaGuid);
+      return registeredSchemaGuid;
+    }
+
     const schema = await createSchema(kind, author);
     writeStorage(storageKey, schema.guid);
 
@@ -396,11 +429,32 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     return schema.guid;
   }
 
-  private async requireConnectionId(): Promise<string> {
-    return (
-      readStorage(walletStorageKeys.cloudAgentConnectionId) ??
-      (await this.ensureCloudAgentConnection())
+  private async findRegisteredSchema(
+    kind: CredentialKind,
+    author: string,
+  ): Promise<string | undefined> {
+    const config = this.requireConfig();
+    const stableSchemaId =
+      kind === "passport"
+        ? config.passportStableSchemaId
+        : config.ticketStableSchemaId;
+    const schemas = await getSchemas();
+    const schema = schemas.contents.find(
+      (candidate) =>
+        candidate.name === kind &&
+        candidate.author === author &&
+        candidate.schema.$id === stableSchemaId,
     );
+
+    return schema?.guid;
+  }
+
+  private async requireConnectionId(): Promise<string> {
+    const connectionId =
+      readStorage(walletStorageKeys.cloudAgentConnectionId) ??
+      (await this.ensureCloudAgentConnection());
+
+    return this.waitForCloudAgentConnectionReady(connectionId);
   }
 
   private async requirePublishedIssuerDID(): Promise<string> {
@@ -428,7 +482,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
       this.processedMessageIds.add(message.id);
       newestCreatedTime = Math.max(newestCreatedTime, message.createdTime);
 
-      const protocolMessage = decodeFlightTixProtocolMessage(message);
+      const protocolMessage = await decodeFlightTixProtocolMessage(message);
       switch (protocolMessage.kind) {
         case "offer": {
           if (!this.shouldAcceptOffer(protocolMessage.thid)) {
@@ -528,6 +582,12 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     status: IdentusStatus,
     patch: Partial<IdentusSnapshot> = {},
   ): void {
+    if (status === "disconnected") {
+      this.snapshot = { ...patch, status };
+      this.onSnapshot(this.snapshot);
+      return;
+    }
+
     this.snapshot = {
       ...this.snapshot,
       ...patch,

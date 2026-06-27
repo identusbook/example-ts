@@ -22,7 +22,7 @@ MEDIATOR_PORT="${IDENTUS_MEDIATOR_PORT:-8080}"
 MEDIATOR_MONGO_PORT="${IDENTUS_MEDIATOR_MONGO_PORT:-27017}"
 MEDIATOR_COMPOSE_PROJECT="${IDENTUS_MEDIATOR_COMPOSE_PROJECT:-flighttix-mediator}"
 MEDIATOR_URL="${NEXT_PUBLIC_MEDIATOR_URL:-http://localhost:${MEDIATOR_PORT}}"
-MEDIATOR_SERVICE_ENDPOINTS="${IDENTUS_MEDIATOR_SERVICE_ENDPOINTS:-${MEDIATOR_URL};ws://localhost:${MEDIATOR_PORT}/ws}"
+MEDIATOR_SERVICE_ENDPOINTS="${IDENTUS_MEDIATOR_SERVICE_ENDPOINTS:-}"
 
 command_name="${1:-help}"
 
@@ -40,6 +40,21 @@ host_ip() {
   fi
 
   printf '127.0.0.1\n'
+}
+
+mediator_service_endpoints() {
+  if [[ -n "$MEDIATOR_SERVICE_ENDPOINTS" ]]; then
+    printf '%s\n' "$MEDIATOR_SERVICE_ENDPOINTS"
+    return
+  fi
+
+  local public_host
+  public_host="${IDENTUS_MEDIATOR_PUBLIC_HOST:-"$(host_ip)"}"
+  printf 'http://%s:%s;ws://%s:%s/ws\n' \
+    "$public_host" \
+    "$MEDIATOR_PORT" \
+    "$public_host" \
+    "$MEDIATOR_PORT"
 }
 
 clone_or_update() {
@@ -96,7 +111,7 @@ EOF
   (
     cd "$MEDIATOR_DIR"
     MEDIATOR_VERSION="$MEDIATOR_VERSION" \
-    SERVICE_ENDPOINTS="$MEDIATOR_SERVICE_ENDPOINTS" \
+    SERVICE_ENDPOINTS="$(mediator_service_endpoints)" \
       docker compose -p "$MEDIATOR_COMPOSE_PROJECT" "${compose_args[@]}" up -d
   )
 }
