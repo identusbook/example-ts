@@ -39,3 +39,11 @@ _Avoid_: API server, backend
 **Mediator**:
 The DIDComm relay that stores and forwards messages for the Traveller's wallet.
 _Avoid_: Message broker, queue
+
+**Credential Thread**:
+The DIDComm thread that links one credential offer, request, and issued credential exchange.
+_Avoid_: Request ID, transaction ID
+
+**Presentation Request**:
+A verifier-initiated request for the Traveller to present proof from a held credential.
+_Avoid_: Login check, validation API call

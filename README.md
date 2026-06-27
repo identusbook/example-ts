@@ -50,6 +50,12 @@ Stop local services:
 npm run infra:stop
 ```
 
+## Browser Wallet Storage
+
+The browser wallet uses the Identus SDK Pluto store with the configured IndexedDB database name, plus app-local `localStorage` keys for the seed, Cloud Agent connection ID, issuer DID, schema GUIDs, credential thread IDs, and login marker. `reset` clears those app keys and asks the browser to delete the wallet IndexedDB database.
+
+This storage is local to the browser profile. Clearing site data removes the wallet, and the example does not provide seed export, recovery, encryption hardening, or cross-device sync.
+
 ## Sanity Checks
 
 ```bash
