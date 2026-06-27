@@ -6,6 +6,7 @@ export const walletStorageKeys = {
   ticketSchemaGuid: "FlightTix.TicketSchemaGuid",
   passportVCThid: "FlightTix.PassportVCThid",
   ticketVCThid: "FlightTix.TicketVCThid",
+  pendingProofKind: "FlightTix.PendingProofKind",
   authValid: "FlightTix.AuthValid",
   lastMessageCreatedTime: "FlightTix.LastMessageCreatedTime",
 } as const;

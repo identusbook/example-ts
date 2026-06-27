@@ -26,7 +26,6 @@ import {
 } from "./credentials";
 import { decodeFlightTixProtocolMessage } from "./protocol";
 import type {
-  DidcommMessage,
   DidcommMessageBatch,
   IdentusAgent,
   IdentusApollo,
@@ -54,6 +53,9 @@ import type {
   RegistrationInput,
   Ticket,
 } from "./types";
+
+type RequestPresentation =
+  import("@hyperledger/identus-sdk/plugins/oea").RequestPresentation;
 
 const didStatusPublished = "PUBLISHED";
 const cloudAgentConnectionReadyState = "ConnectionResponseSent";
@@ -210,6 +212,7 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     this.setEvent(
       `${kind === "ticket" ? "Ticket" : "Passport"} proof requested`,
     );
+    writeStorage(walletStorageKeys.pendingProofKind, kind);
     await createPresentation({ connectionId, issuerDID, schemaGuid });
   }
 
@@ -503,16 +506,23 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
           break;
         }
         case "presentationRequest": {
-          const credential = await this.findCredentialForPresentation(message);
-          if (credential) {
-            const presentation = await agent.createPresentationForRequestProof(
+          try {
+            const credential = await this.findCredentialForPresentation(
               protocolMessage.message,
-              credential,
             );
-            await agent.send(presentation.makeMessage());
-            this.setEvent("Presentation sent");
-          } else {
-            this.setEvent("No matching credential for presentation request");
+            if (credential) {
+              const presentation =
+                await agent.createPresentationForRequestProof(
+                  protocolMessage.message,
+                  credential,
+                );
+              await agent.send(presentation.makeMessage());
+              this.setEvent("Presentation sent");
+            } else {
+              this.setEvent("No matching credential for presentation request");
+            }
+          } finally {
+            deleteStorage(walletStorageKeys.pendingProofKind);
           }
           break;
         }
@@ -536,19 +546,35 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
   }
 
   private async findCredentialForPresentation(
-    message: DidcommMessage,
+    request: RequestPresentation,
   ): Promise<VerifiableCredential | undefined> {
-    const ticketSchemaGuid = readStorage(walletStorageKeys.ticketSchemaGuid);
-    const serializedMessage = JSON.stringify(message);
+    const pendingProofKind = credentialKindFromStorage(
+      readStorage(walletStorageKeys.pendingProofKind),
+    );
+    const pendingSchemaGuid = pendingProofKind
+      ? readStorage(schemaStorageKeyForKind(pendingProofKind))
+      : undefined;
 
-    if (ticketSchemaGuid && serializedMessage.includes(ticketSchemaGuid)) {
+    if (pendingSchemaGuid) {
+      return this.findCredentialBySchema(pendingSchemaGuid);
+    }
+
+    const ticketSchemaGuid = readStorage(walletStorageKeys.ticketSchemaGuid);
+
+    if (
+      ticketSchemaGuid &&
+      presentationRequestContainsSchema(request, ticketSchemaGuid)
+    ) {
       return this.findCredentialBySchema(ticketSchemaGuid);
     }
 
     const passportSchemaGuid = readStorage(
       walletStorageKeys.passportSchemaGuid,
     );
-    if (passportSchemaGuid && serializedMessage.includes(passportSchemaGuid)) {
+    if (
+      passportSchemaGuid &&
+      presentationRequestContainsSchema(request, passportSchemaGuid)
+    ) {
       return this.findCredentialBySchema(passportSchemaGuid);
     }
   }
@@ -605,4 +631,48 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function credentialKindFromStorage(
+  value: string | undefined,
+): CredentialKind | undefined {
+  if (value === "passport" || value === "ticket") {
+    return value;
+  }
+}
+
+function schemaStorageKeyForKind(kind: CredentialKind) {
+  return kind === "ticket"
+    ? walletStorageKeys.ticketSchemaGuid
+    : walletStorageKeys.passportSchemaGuid;
+}
+
+function presentationRequestContainsSchema(
+  request: RequestPresentation,
+  schemaGuid: string,
+): boolean {
+  return request.decodedAttachments.some((attachment: unknown) =>
+    containsString(attachment, (value) =>
+      value.includes(`/schemas/${schemaGuid}/schema`),
+    ),
+  );
+}
+
+function containsString(
+  value: unknown,
+  predicate: (value: string) => boolean,
+): boolean {
+  if (typeof value === "string") {
+    return predicate(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => containsString(item, predicate));
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return Object.values(value).some((item) => containsString(item, predicate));
 }
