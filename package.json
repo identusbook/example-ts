@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "infra:bootstrap": "bash scripts/identus-infra.sh bootstrap",
+    "infra:start": "bash scripts/identus-infra.sh start",
+    "infra:health": "bash scripts/identus-infra.sh health",
+    "infra:stop": "bash scripts/identus-infra.sh stop"
   },
   "dependencies": {
     "next": "^16.2.9",
