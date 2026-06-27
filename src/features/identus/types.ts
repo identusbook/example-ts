@@ -1,8 +1,10 @@
 import type {
+  CredentialKind,
   Flight,
   PassportClaims,
   TicketClaims,
 } from "@/lib/flighttix/domain";
+import type { PresentationStatus } from "@/server/identus/cloud-agent";
 
 export type IdentusStatus =
   | "disconnected"
@@ -79,6 +81,32 @@ export interface RegistrationInput {
   dob: string;
 }
 
+export interface ProofRequestResult {
+  kind: CredentialKind;
+  presentation: PresentationStatus;
+  requestedAt: string;
+  schemaGuid: string;
+}
+
+export type SecurityReviewStatus =
+  | "pending"
+  | "accepted"
+  | "denied"
+  | "not-presented";
+
+export interface SecurityPresentationRecord {
+  id: string;
+  protocolStatus: string;
+  requestedAt: string;
+  requestedSchemaGuid: string;
+  reviewStatus: SecurityReviewStatus;
+  passportValid: boolean;
+  ticketValid: boolean;
+  proofSentAt?: string;
+  reviewedAt?: string;
+  threadId?: string;
+}
+
 export interface FlightTixWallet {
   start(): Promise<IdentusSnapshot>;
   stop(): Promise<void>;
@@ -86,7 +114,7 @@ export interface FlightTixWallet {
   isLoggedIn(): Promise<boolean>;
   issuePassport(input: RegistrationInput): Promise<void>;
   issueTicket(flight: Flight): Promise<void>;
-  requestProof(kind: "passport" | "ticket"): Promise<void>;
+  requestProof(kind: "passport" | "ticket"): Promise<ProofRequestResult>;
   readPassport(): Promise<Passport | undefined>;
   readTicket(): Promise<Ticket | undefined>;
   getSnapshot(): IdentusSnapshot;

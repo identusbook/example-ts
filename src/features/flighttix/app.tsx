@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CheckCircle2,
   Hand,
   IdCard,
   LoaderCircle,
@@ -11,6 +12,7 @@ import {
   Ticket,
   UserCircle,
   Wrench,
+  XCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -19,6 +21,8 @@ import {
   type IdentusDebugLogEntry,
   identusStatusLabels,
   type Passport,
+  type SecurityPresentationRecord,
+  type SecurityReviewStatus,
 } from "@/features/identus/types";
 import type { Flight } from "@/lib/flighttix/domain";
 import {
@@ -204,17 +208,183 @@ function TicketPanel({ ticket }: { ticket?: FlightTicket }) {
 }
 
 function SecurityPanel({ app }: { app: FlightTixController }) {
+  const currentPresentation =
+    app.securityPresentations[app.securityPresentations.length - 1];
+
   return (
-    <section className="flighttix-view compact">
-      <button
-        className="flighttix-button primary"
-        disabled={app.busyAction === "securityProof"}
-        onClick={() => void app.requestTicketProof()}
-        type="button"
-      >
-        <Send aria-hidden size={18} />
-        <span>Request Proof of Ticket</span>
-      </button>
+    <section className="flighttix-security">
+      <div className="flighttix-security-toolbar">
+        <button
+          className="flighttix-button primary"
+          disabled={app.busyAction === "securityProof"}
+          onClick={() => void app.requestTicketProof()}
+          type="button"
+        >
+          <Send aria-hidden size={18} />
+          <span>Request Proof of Ticket</span>
+        </button>
+      </div>
+
+      <SecurityPresentationDetails
+        app={app}
+        presentation={currentPresentation}
+      />
+      <SecurityPresentationHistory presentations={app.securityPresentations} />
+    </section>
+  );
+}
+
+function SecurityPresentationDetails({
+  app,
+  presentation,
+}: {
+  app: FlightTixController;
+  presentation?: SecurityPresentationRecord;
+}) {
+  if (!presentation) {
+    return (
+      <section className="flighttix-security-card empty">
+        <h2>Current Proof Request</h2>
+        <p>No ticket proof has been requested in this session.</p>
+      </section>
+    );
+  }
+
+  const canReview =
+    Boolean(presentation.proofSentAt) &&
+    presentation.reviewStatus === "pending";
+
+  return (
+    <section className="flighttix-security-card">
+      <div className="flighttix-section-heading">
+        <div>
+          <h2>Current Proof Request</h2>
+          <p>{formatTimestamp(presentation.requestedAt)}</p>
+        </div>
+        <span className={`flighttix-review-badge ${presentation.reviewStatus}`}>
+          {formatReviewStatus(presentation.reviewStatus)}
+        </span>
+      </div>
+
+      <div className="flighttix-validity-grid">
+        <ValidityPill label="Ticket Valid" valid={presentation.ticketValid} />
+        <ValidityPill
+          label="Passport Valid"
+          valid={presentation.passportValid}
+        />
+      </div>
+
+      <dl className="flighttix-proof-details">
+        <div>
+          <dt>Presentation ID</dt>
+          <dd title={presentation.id}>{shortenIdentifier(presentation.id)}</dd>
+        </div>
+        <div>
+          <dt>Thread ID</dt>
+          <dd title={presentation.threadId ?? undefined}>
+            {formatDebugValue(presentation.threadId)}
+          </dd>
+        </div>
+        <div>
+          <dt>Requested Schema</dt>
+          <dd title={presentation.requestedSchemaGuid}>
+            {shortenIdentifier(presentation.requestedSchemaGuid)}
+          </dd>
+        </div>
+        <div>
+          <dt>Protocol Status</dt>
+          <dd>{presentation.protocolStatus}</dd>
+        </div>
+        <div>
+          <dt>Requested</dt>
+          <dd>{formatTimestamp(presentation.requestedAt)}</dd>
+        </div>
+        <div>
+          <dt>Proof Sent</dt>
+          <dd>{formatMaybeTimestamp(presentation.proofSentAt, "Not sent")}</dd>
+        </div>
+        <div>
+          <dt>Review Recorded</dt>
+          <dd>
+            {formatMaybeTimestamp(presentation.reviewedAt, "Not recorded")}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="flighttix-security-review-actions">
+        <button
+          className="flighttix-button primary"
+          disabled={!canReview}
+          onClick={() =>
+            app.reviewSecurityPresentation(presentation.id, "accepted")
+          }
+          type="button"
+        >
+          <CheckCircle2 aria-hidden size={18} />
+          <span>Accept</span>
+        </button>
+        <button
+          className="flighttix-button secondary danger"
+          disabled={!canReview}
+          onClick={() =>
+            app.reviewSecurityPresentation(presentation.id, "denied")
+          }
+          type="button"
+        >
+          <XCircle aria-hidden size={18} />
+          <span>Deny</span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ValidityPill({ label, valid }: { label: string; valid: boolean }) {
+  return (
+    <div className={`flighttix-validity-pill ${valid ? "valid" : "invalid"}`}>
+      {valid ? (
+        <CheckCircle2 aria-hidden size={18} />
+      ) : (
+        <XCircle aria-hidden size={18} />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function SecurityPresentationHistory({
+  presentations,
+}: {
+  presentations: SecurityPresentationRecord[];
+}) {
+  return (
+    <section className="flighttix-security-card">
+      <div className="flighttix-section-heading">
+        <div>
+          <h2>Presentation History</h2>
+          <p>{presentations.length} requests this session</p>
+        </div>
+      </div>
+
+      {presentations.length === 0 ? (
+        <p className="flighttix-history-empty">No previous presentations.</p>
+      ) : (
+        <div className="flighttix-history-list">
+          {presentations.map((presentation) => (
+            <div className="flighttix-history-row" key={presentation.id}>
+              <time dateTime={presentation.requestedAt}>
+                {formatTimestamp(presentation.requestedAt)}
+              </time>
+              <span>{presentation.protocolStatus}</span>
+              <span>{formatReviewStatus(presentation.reviewStatus)}</span>
+              <span>
+                Ticket {presentation.ticketValid ? "Valid" : "Invalid"} /
+                Passport {presentation.passportValid ? "Valid" : "Invalid"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -504,6 +674,35 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeZone: "UTC",
   }).format(date);
+}
+
+function formatMaybeTimestamp(value: string | undefined, fallback: string) {
+  return value ? formatTimestamp(value) : fallback;
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(date);
+}
+
+function formatReviewStatus(status: SecurityReviewStatus): string {
+  switch (status) {
+    case "accepted":
+      return "Accepted";
+    case "denied":
+      return "Denied";
+    case "not-presented":
+      return "Not Presented";
+    case "pending":
+      return "Pending";
+  }
 }
 
 function formatDebugValue(value?: string): string {

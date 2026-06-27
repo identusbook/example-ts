@@ -121,6 +121,16 @@ export async function createPresentation(input: {
   });
 }
 
+export async function getPresentation(
+  presentationId: string,
+): Promise<PresentationStatus> {
+  return apiJson(
+    `/api/flighttix/cloud-agent/presentations/${encodeURIComponent(
+      presentationId,
+    )}`,
+  );
+}
+
 async function apiJson<T>(
   path: string,
   options: {

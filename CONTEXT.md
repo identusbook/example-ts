@@ -47,3 +47,7 @@ _Avoid_: Request ID, transaction ID
 **Presentation Request**:
 A verifier-initiated request for the Traveller to present proof from a held credential.
 _Avoid_: Login check, validation API call
+
+**Security Review**:
+The Security Officer's accept or deny decision after reviewing a Presentation Request.
+_Avoid_: Protocol status, Cloud Agent status

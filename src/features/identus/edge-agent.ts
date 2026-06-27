@@ -51,6 +51,7 @@ import type {
   IdentusSnapshot,
   IdentusStatus,
   Passport,
+  ProofRequestResult,
   RegistrationInput,
   Ticket,
 } from "./types";
@@ -227,15 +228,29 @@ export class BrowserFlightTixWallet implements FlightTixWallet {
     this.setEvent("Ticket credential offer requested");
   }
 
-  async requestProof(kind: CredentialKind): Promise<void> {
+  async requestProof(kind: CredentialKind): Promise<ProofRequestResult> {
     const connectionId = await this.requireConnectionId();
     const issuerDID = await this.requirePublishedIssuerDID();
     const schemaGuid = await this.ensureSchema(kind);
+    const requestedAt = new Date().toISOString();
     this.setEvent(
-      `${kind === "ticket" ? "Ticket" : "Passport"} proof requested`,
+      `${schemaLabel(kind)} proof requested`,
+      "info",
+      schemaSnapshotPatch(kind, schemaGuid),
     );
     writeStorage(walletStorageKeys.pendingProofKind, kind);
-    await createPresentation({ connectionId, issuerDID, schemaGuid });
+    const presentation = await createPresentation({
+      connectionId,
+      issuerDID,
+      schemaGuid,
+    });
+    this.setEvent(
+      `${schemaLabel(kind)} presentation request created`,
+      "info",
+      schemaSnapshotPatch(kind, schemaGuid),
+    );
+
+    return { kind, presentation, requestedAt, schemaGuid };
   }
 
   async readPassport(): Promise<Passport | undefined> {
