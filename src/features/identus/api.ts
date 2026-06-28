@@ -14,8 +14,8 @@ import type {
   ManagedDid,
   ManagedDidPage,
   PresentationStatus,
-} from "@/server/identus/cloud-agent";
-import type { MediatorInfo } from "@/server/identus/mediator";
+} from "@/lib/identus/cloud-agent-types";
+import type { MediatorInfo } from "@/lib/identus/mediator-types";
 
 export interface PublicFlightTixConfig {
   mediatorUrl: string;

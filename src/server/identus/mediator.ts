@@ -1,11 +1,5 @@
+import type { MediatorInfo } from "@/lib/identus/mediator-types";
 import { getFlightTixConfig } from "./config";
-
-export interface MediatorInfo {
-  health: "ok";
-  version: string;
-  did: string;
-  invitationOOB: string;
-}
 
 export async function getMediatorInfo(): Promise<MediatorInfo> {
   const mediatorUrl = getFlightTixConfig().mediatorUrl;

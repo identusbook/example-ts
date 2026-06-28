@@ -4,7 +4,7 @@ import type {
   PassportClaims,
   TicketClaims,
 } from "@/lib/flighttix/domain";
-import type { PresentationStatus } from "@/server/identus/cloud-agent";
+import type { PresentationStatus } from "@/lib/identus/cloud-agent-types";
 
 export type IdentusStatus =
   | "disconnected"
