@@ -5,7 +5,9 @@
   --foreground: #1b2733;
   --muted: #607080;
   --line: #d7dde2;
+  --line-strong: #c4ced6;
   --panel: #ffffff;
+  --panel-muted: #f8fafb;
   --primary: #0f766e;
   --primary-strong: #115e59;
   --accent: #3b82f6;
@@ -33,6 +35,8 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricprecision;
 }
 
 button,
@@ -52,10 +56,10 @@ button:disabled {
 
 .flighttix-shell {
   height: 100dvh;
-  padding: 24px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   overflow: hidden;
 }
 
@@ -64,6 +68,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex: 0 0 auto;
 }
 
 .flighttix-topbar h1,
@@ -78,6 +83,7 @@ button:disabled {
   margin: 0 0 2px;
   color: var(--muted);
   font-size: 14px;
+  font-weight: 700;
 }
 
 .flighttix-status {
@@ -85,7 +91,7 @@ button:disabled {
   max-width: 360px;
   min-height: 56px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: var(--panel);
   display: flex;
@@ -97,7 +103,7 @@ button:disabled {
 
 .flighttix-status span {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .flighttix-status small {
@@ -124,7 +130,7 @@ button:disabled {
 .flighttix-tabs {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 6px;
   padding: 12px;
   border-right: 1px solid var(--line);
   background: #edf3f1;
@@ -145,6 +151,12 @@ button:disabled {
   text-align: left;
 }
 
+.flighttix-tab span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .flighttix-tab[aria-current="page"] {
   border-color: #b7ccc8;
   background: #ffffff;
@@ -155,8 +167,9 @@ button:disabled {
 .flighttix-panel {
   min-height: 0;
   position: relative;
-  padding: 28px;
+  padding: 24px 28px;
   overflow: auto;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
 }
 
 .flighttix-view {
@@ -165,6 +178,13 @@ button:disabled {
   align-content: center;
   justify-items: center;
   gap: 22px;
+}
+
+.flighttix-action-stack {
+  width: min(100%, 440px);
+  display: grid;
+  justify-items: center;
+  gap: 20px;
 }
 
 .flighttix-view.compact {
@@ -213,8 +233,15 @@ button:disabled {
   padding: 0 12px;
 }
 
+.flighttix-field input:focus,
+.flighttix-field select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  outline: 0;
+}
+
 .flighttix-button {
-  min-height: 44px;
+  min-height: 42px;
   min-width: 150px;
   padding: 0 14px;
   border-radius: 8px;
@@ -224,6 +251,8 @@ button:disabled {
   justify-content: center;
   gap: 8px;
   font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
 }
 
 .flighttix-button.primary {
@@ -268,14 +297,14 @@ button:disabled {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 24px;
+  gap: 18px;
 }
 
 .flighttix-security {
   min-height: 100%;
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 12px;
 }
 
 .flighttix-security-toolbar {
@@ -287,12 +316,12 @@ button:disabled {
 
 .flighttix-security-card {
   min-width: 0;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .flighttix-security-card.empty {
@@ -341,6 +370,11 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.flighttix-review-badge.pending {
+  border-color: #f7c66f;
+  color: #7a4d00;
+}
+
 .flighttix-review-badge.accepted {
   border-color: #9fd4c8;
   color: var(--primary-strong);
@@ -360,7 +394,7 @@ button:disabled {
 
 .flighttix-validity-pill {
   min-width: 0;
-  min-height: 44px;
+  min-height: 40px;
   padding: 8px 10px;
   border: 1px solid #c8d1d9;
   border-radius: 8px;
@@ -369,6 +403,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .flighttix-validity-pill.valid {
@@ -392,7 +427,7 @@ button:disabled {
 
 .flighttix-proof-details div {
   min-width: 0;
-  padding: 9px 10px;
+  padding: 8px 9px;
   border: 1px solid #dce5e9;
   border-radius: 8px;
   background: #f8fafb;
@@ -441,6 +476,7 @@ button:disabled {
   border-radius: 8px;
   background: #f8fafb;
   font-size: 12px;
+  line-height: 1.35;
 }
 
 .flighttix-history-row time,
@@ -456,25 +492,64 @@ button:disabled {
 
 .flighttix-details {
   margin: 0;
-  min-width: min(100%, 340px);
+  width: min(100%, 420px);
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .flighttix-details dt {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: 20px;
   font-weight: 750;
 }
 
 .flighttix-details dd {
   margin: 0;
-  font-size: 17px;
+  padding: 10px 12px;
+  border: 1px solid #dce5e9;
+  border-radius: 8px;
+  background: var(--panel-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 15px;
+}
+
+.flighttix-details dd span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.flighttix-details dd strong {
+  min-width: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.flighttix-empty-state {
+  width: min(100%, 380px);
+  min-height: 160px;
+  padding: 22px;
+  border: 1px dashed #cdd7dd;
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.flighttix-empty-state p {
+  margin: 0;
 }
 
 .flighttix-alert {
   align-self: center;
-  max-width: min(100%, 760px);
+  width: min(100%, 760px);
   min-height: 40px;
   padding: 10px 14px;
   border: 1px solid #b7ccc8;
@@ -482,6 +557,8 @@ button:disabled {
   background: #eef8f5;
   color: var(--primary-strong);
   font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .flighttix-alert.error {
@@ -493,15 +570,15 @@ button:disabled {
 .flighttix-debug-pane {
   flex: 0 0 auto;
   width: 100%;
-  height: clamp(230px, 30vh, 320px);
-  min-height: 220px;
+  height: clamp(210px, 24vh, 280px);
+  min-height: 200px;
   border: 1px solid #c9d4dc;
   border-radius: 8px;
   background: #ffffff;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
-  box-shadow: 0 14px 32px rgba(28, 39, 51, 0.1);
+  box-shadow: 0 12px 30px rgba(28, 39, 51, 0.1);
 }
 
 .flighttix-debug-header {
@@ -568,7 +645,7 @@ button:disabled {
   border-bottom: 1px solid var(--line);
   background: #f3f7f7;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -685,7 +762,7 @@ button:disabled {
   inset: 0;
   z-index: 20;
   padding: 20px;
-  background: rgba(10, 18, 26, 0.46);
+  background: rgba(10, 18, 26, 0.5);
   display: grid;
   place-items: center;
 }
@@ -694,7 +771,7 @@ button:disabled {
   width: min(100%, 520px);
   max-height: min(760px, calc(100vh - 40px));
   overflow: auto;
-  padding: 24px;
+  padding: 22px;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: var(--shadow);
@@ -715,6 +792,7 @@ button:disabled {
 .flighttix-modal legend {
   padding: 0;
   font-size: 20px;
+  line-height: 1.25;
 }
 
 .flighttix-modal-actions {
@@ -727,7 +805,7 @@ button:disabled {
 
 .flighttix-loading {
   height: 100dvh;
-  padding: 32px 20px;
+  padding: 28px 20px;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 16px;
@@ -739,7 +817,7 @@ button:disabled {
   min-height: 0;
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .flighttix-loading .flighttix-debug-pane {
@@ -754,7 +832,7 @@ button:disabled {
 .flighttix-loading-center img {
   width: min(260px, 80vw);
   height: auto;
-  margin: 12px 0 20px;
+  margin: 8px 0 18px;
 }
 
 .flighttix-progress {
@@ -791,6 +869,11 @@ button:disabled {
     padding: 10px;
   }
 
+  .flighttix-topbar h1,
+  .flighttix-loading h1 {
+    font-size: 31px;
+  }
+
   .flighttix-topbar {
     align-items: stretch;
     flex-direction: column;
@@ -822,7 +905,7 @@ button:disabled {
   }
 
   .flighttix-panel {
-    padding: 18px 14px;
+    padding: 16px 14px;
   }
 
   .flighttix-icon-button.profile {
@@ -837,6 +920,24 @@ button:disabled {
   .flighttix-button-row,
   .flighttix-modal-actions {
     width: 100%;
+  }
+
+  .flighttix-details dd {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .flighttix-details dd strong {
+    text-align: left;
+  }
+
+  .flighttix-modal-backdrop {
+    padding: 12px;
+  }
+
+  .flighttix-modal {
+    padding: 18px;
   }
 
   .flighttix-security-toolbar,
@@ -864,8 +965,8 @@ button:disabled {
   }
 
   .flighttix-debug-pane {
-    height: clamp(230px, 34vh, 280px);
-    min-height: 220px;
+    height: clamp(220px, 30vh, 260px);
+    min-height: 210px;
   }
 
   .flighttix-debug-header {

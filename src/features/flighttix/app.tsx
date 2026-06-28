@@ -161,31 +161,33 @@ function PurchasePanel({ app }: { app: FlightTixController }) {
         <UserCircle aria-hidden size={34} />
       </button>
 
-      <label className="flighttix-field">
-        <span>Choose Flight:</span>
-        <select
-          id="flight-selection"
-          name="flight"
-          onChange={(event) => app.selectFlight(event.target.value)}
-          value={app.selectedFlightId ?? ""}
-        >
-          {app.flights.map((flight) => (
-            <option key={flight.id} value={flight.id}>
-              {formatFlightOption(flight)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="flighttix-action-stack">
+        <label className="flighttix-field">
+          <span>Choose Flight</span>
+          <select
+            id="flight-selection"
+            name="flight"
+            onChange={(event) => app.selectFlight(event.target.value)}
+            value={app.selectedFlightId ?? ""}
+          >
+            {app.flights.map((flight) => (
+              <option key={flight.id} value={flight.id}>
+                {formatFlightOption(flight)}
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <button
-        className="flighttix-button primary"
-        disabled={!app.selectedFlight || app.busyAction === "purchase"}
-        onClick={() => void app.purchaseTicket()}
-        type="button"
-      >
-        <Ticket aria-hidden size={18} />
-        <span>Purchase Ticket</span>
-      </button>
+        <button
+          className="flighttix-button primary"
+          disabled={!app.selectedFlight || app.busyAction === "purchase"}
+          onClick={() => void app.purchaseTicket()}
+          type="button"
+        >
+          <Ticket aria-hidden size={18} />
+          <span>Purchase Ticket</span>
+        </button>
+      </div>
     </section>
   );
 }
@@ -194,13 +196,25 @@ function TicketPanel({ ticket }: { ticket?: FlightTicket }) {
   return (
     <section className="flighttix-view compact">
       {!ticket ? (
-        <p className="flighttix-loading-text">Loading Ticket Details...</p>
+        <div className="flighttix-empty-state">
+          <Ticket aria-hidden size={30} />
+          <p>No ticket credential has been stored yet.</p>
+        </div>
       ) : (
         <dl className="flighttix-details">
-          <dt>Your Ticket Details:</dt>
-          <dd>Departure: {ticket.departure}</dd>
-          <dd>Arrival: {ticket.arrival}</dd>
-          <dd>Price: {formatPrice(ticket.price)}</dd>
+          <dt>Your Ticket Details</dt>
+          <dd>
+            <span>Departure</span>
+            <strong>{ticket.departure}</strong>
+          </dd>
+          <dd>
+            <span>Arrival</span>
+            <strong>{ticket.arrival}</strong>
+          </dd>
+          <dd>
+            <span>Price</span>
+            <strong>{formatPrice(ticket.price)}</strong>
+          </dd>
         </dl>
       )}
     </section>
@@ -646,9 +660,18 @@ function PassportDetails({ passport }: { passport: Passport }) {
   return (
     <dl className="flighttix-details">
       <dt>Passport Details</dt>
-      <dd>Name: {passport.name}</dd>
-      <dd>Passport Number: {passport.passportNumber}</dd>
-      <dd>Birthdate: {formatDate(passport.dob)}</dd>
+      <dd>
+        <span>Name</span>
+        <strong>{passport.name}</strong>
+      </dd>
+      <dd>
+        <span>Passport Number</span>
+        <strong>{passport.passportNumber}</strong>
+      </dd>
+      <dd>
+        <span>Birthdate</span>
+        <strong>{formatDate(passport.dob)}</strong>
+      </dd>
     </dl>
   );
 }
