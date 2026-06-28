@@ -172,23 +172,150 @@ button:disabled {
   background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
 }
 
-.flighttix-view {
+.flighttix-screen {
   min-height: 100%;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 22px;
+  gap: 16px;
+  position: relative;
 }
 
-.flighttix-action-stack {
-  width: min(100%, 440px);
+.flighttix-screen-header {
+  width: min(100%, 680px);
+  display: grid;
+  gap: 3px;
+}
+
+.flighttix-screen-header.centered {
+  justify-items: center;
+  text-align: center;
+}
+
+.flighttix-screen-header h2,
+.flighttix-screen-header p,
+.flighttix-dev-group h3 {
+  margin: 0;
+}
+
+.flighttix-screen-header h2 {
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.flighttix-screen-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.flighttix-purchase-form {
+  width: min(100%, 520px);
   display: grid;
   justify-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
-.flighttix-view.compact {
-  min-height: 100%;
+.flighttix-control-card,
+.flighttix-ticket-card,
+.flighttix-dev-group {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.flighttix-control-card {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.flighttix-primary-action {
+  width: min(100%, 240px);
+}
+
+.flighttix-flight-summary,
+.flighttix-ticket-card {
+  display: grid;
+  gap: 14px;
+}
+
+.flighttix-flight-summary {
+  padding: 14px;
+  border: 1px solid #dce5e9;
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
+.flighttix-route {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.flighttix-route div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dce5e9;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.flighttix-route span,
+.flighttix-flight-summary dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.flighttix-route strong {
+  min-width: 0;
+  font-size: 25px;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.flighttix-route svg {
+  color: var(--primary);
+}
+
+.flighttix-route.large strong {
+  font-size: 32px;
+}
+
+.flighttix-flight-summary dl {
+  margin: 0;
+}
+
+.flighttix-flight-summary dl div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flighttix-flight-summary dt,
+.flighttix-flight-summary dd {
+  margin: 0;
+}
+
+.flighttix-flight-summary dd {
+  font-weight: 800;
+}
+
+.flighttix-ticket-card {
+  width: min(100%, 520px);
+  padding: 18px;
 }
 
 .flighttix-icon-button {
@@ -285,19 +412,42 @@ button:disabled {
   color: var(--danger);
 }
 
-.flighttix-button-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+.flighttix-dev-screen {
+  align-content: start;
+  justify-items: stretch;
+  width: min(100%, 900px);
+  margin: 0 auto;
+}
+
+.flighttix-dev-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-.flighttix-dev {
-  min-height: 100%;
+.flighttix-dev-group {
+  padding: 14px;
   display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 18px;
+  align-content: start;
+  gap: 12px;
+}
+
+.flighttix-dev-group h3 {
+  color: #243340;
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.flighttix-dev-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.flighttix-dev-actions .flighttix-button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
 }
 
 .flighttix-security {
@@ -541,6 +691,15 @@ button:disabled {
   gap: 10px;
   text-align: center;
   font-weight: 800;
+}
+
+.flighttix-empty-state.compact {
+  min-height: 120px;
+  padding: 18px;
+}
+
+.flighttix-empty-state strong {
+  color: #243340;
 }
 
 .flighttix-empty-state p {
@@ -917,9 +1076,54 @@ button:disabled {
     width: 100%;
   }
 
-  .flighttix-button-row,
   .flighttix-modal-actions {
     width: 100%;
+  }
+
+  .flighttix-screen {
+    gap: 12px;
+  }
+
+  .flighttix-purchase-screen {
+    padding-top: 34px;
+  }
+
+  .flighttix-icon-button.profile {
+    top: 0;
+    right: 0;
+    width: 42px;
+    height: 42px;
+  }
+
+  .flighttix-screen-header h2 {
+    font-size: 19px;
+  }
+
+  .flighttix-control-card,
+  .flighttix-ticket-card,
+  .flighttix-dev-group {
+    padding: 12px;
+  }
+
+  .flighttix-route {
+    gap: 8px;
+  }
+
+  .flighttix-route div {
+    padding: 9px 8px;
+  }
+
+  .flighttix-route strong,
+  .flighttix-route.large strong {
+    font-size: 24px;
+  }
+
+  .flighttix-dev-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flighttix-dev-actions .flighttix-button {
+    justify-content: center;
   }
 
   .flighttix-details dd {

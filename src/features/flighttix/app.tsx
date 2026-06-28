@@ -150,8 +150,10 @@ function StatusPill({ app }: { app: FlightTixController }) {
 }
 
 function PurchasePanel({ app }: { app: FlightTixController }) {
+  const selectedFlight = app.selectedFlight;
+
   return (
-    <section className="flighttix-view">
+    <section className="flighttix-screen flighttix-purchase-screen">
       <button
         aria-label="Profile"
         className="flighttix-icon-button profile"
@@ -161,61 +163,122 @@ function PurchasePanel({ app }: { app: FlightTixController }) {
         <UserCircle aria-hidden size={34} />
       </button>
 
-      <div className="flighttix-action-stack">
-        <label className="flighttix-field">
-          <span>Choose Flight</span>
-          <select
-            id="flight-selection"
-            name="flight"
-            onChange={(event) => app.selectFlight(event.target.value)}
-            value={app.selectedFlightId ?? ""}
-          >
-            {app.flights.map((flight) => (
-              <option key={flight.id} value={flight.id}>
-                {formatFlightOption(flight)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="flighttix-screen-header centered">
+        <p className="flighttix-screen-kicker">Purchase</p>
+        <h2>Flight selection</h2>
+      </div>
+
+      <form
+        className="flighttix-purchase-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void app.purchaseTicket();
+        }}
+      >
+        <div className="flighttix-control-card">
+          <label className="flighttix-field">
+            <span>Choose Flight</span>
+            <select
+              id="flight-selection"
+              name="flight"
+              onChange={(event) => app.selectFlight(event.target.value)}
+              value={app.selectedFlightId ?? ""}
+            >
+              {app.flights.map((flight) => (
+                <option key={flight.id} value={flight.id}>
+                  {formatFlightOption(flight)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {selectedFlight ? (
+            <FlightSummary flight={selectedFlight} />
+          ) : (
+            <div className="flighttix-empty-state compact">
+              <Plane aria-hidden size={28} />
+              <p>No flights are available.</p>
+            </div>
+          )}
+        </div>
 
         <button
-          className="flighttix-button primary"
-          disabled={!app.selectedFlight || app.busyAction === "purchase"}
-          onClick={() => void app.purchaseTicket()}
-          type="button"
+          className="flighttix-button primary flighttix-primary-action"
+          disabled={!selectedFlight || app.busyAction === "purchase"}
+          type="submit"
         >
           <Ticket aria-hidden size={18} />
           <span>Purchase Ticket</span>
         </button>
+      </form>
+    </section>
+  );
+}
+
+function FlightSummary({ flight }: { flight: Flight }) {
+  return (
+    <section className="flighttix-flight-summary">
+      <div className="flighttix-route">
+        <div>
+          <span>Departure</span>
+          <strong>{flight.departure}</strong>
+        </div>
+        <Plane aria-hidden size={22} />
+        <div>
+          <span>Arrival</span>
+          <strong>{flight.arrival}</strong>
+        </div>
       </div>
+      <dl>
+        <div>
+          <dt>Price</dt>
+          <dd>{formatPrice(flight.price)}</dd>
+        </div>
+      </dl>
     </section>
   );
 }
 
 function TicketPanel({ ticket }: { ticket?: FlightTicket }) {
   return (
-    <section className="flighttix-view compact">
+    <section className="flighttix-screen flighttix-ticket-screen">
+      <div className="flighttix-screen-header centered">
+        <p className="flighttix-screen-kicker">Ticket</p>
+        <h2>Stored credential</h2>
+      </div>
+
       {!ticket ? (
         <div className="flighttix-empty-state">
           <Ticket aria-hidden size={30} />
-          <p>No ticket credential has been stored yet.</p>
+          <strong>No ticket credential</strong>
+          <p>Purchase a flight to store one in this wallet.</p>
         </div>
       ) : (
-        <dl className="flighttix-details">
-          <dt>Your Ticket Details</dt>
-          <dd>
-            <span>Departure</span>
-            <strong>{ticket.departure}</strong>
-          </dd>
-          <dd>
-            <span>Arrival</span>
-            <strong>{ticket.arrival}</strong>
-          </dd>
-          <dd>
-            <span>Price</span>
-            <strong>{formatPrice(ticket.price)}</strong>
-          </dd>
-        </dl>
+        <section className="flighttix-ticket-card">
+          <div className="flighttix-route large">
+            <div>
+              <span>Departure</span>
+              <strong>{ticket.departure}</strong>
+            </div>
+            <Plane aria-hidden size={24} />
+            <div>
+              <span>Arrival</span>
+              <strong>{ticket.arrival}</strong>
+            </div>
+          </div>
+
+          <dl className="flighttix-details">
+            <dt>Ticket Details</dt>
+            <dd>
+              <span>Price</span>
+              <strong>{formatPrice(ticket.price)}</strong>
+            </dd>
+            <dd>
+              <span>Credential</span>
+              <strong>Stored in wallet</strong>
+            </dd>
+          </dl>
+        </section>
       )}
     </section>
   );
@@ -405,75 +468,93 @@ function SecurityPresentationHistory({
 
 function DevPanel({ app }: { app: FlightTixController }) {
   return (
-    <section className="flighttix-dev">
-      <button
-        className="flighttix-button secondary"
-        disabled={app.busyAction === "reset"}
-        onClick={() => void app.resetWallet()}
-        type="button"
-      >
-        <RotateCcw aria-hidden size={18} />
-        <span>Reset Wallet</span>
-      </button>
-
-      <div className="flighttix-button-row">
-        <button
-          className="flighttix-button secondary"
-          disabled={app.busyAction === "startup"}
-          onClick={() => void app.startWallet()}
-          type="button"
-        >
-          <Power aria-hidden size={18} />
-          <span>Start Up and Connect</span>
-        </button>
-        <button
-          className="flighttix-button secondary"
-          disabled={app.busyAction === "stop"}
-          onClick={() => void app.stopWallet()}
-          type="button"
-        >
-          <Power aria-hidden size={18} />
-          <span>Stop</span>
-        </button>
+    <section className="flighttix-screen flighttix-dev-screen">
+      <div className="flighttix-screen-header">
+        <p className="flighttix-screen-kicker">Dev Utils</p>
+        <h2>Wallet controls</h2>
       </div>
 
-      <button
-        className="flighttix-button secondary"
-        disabled={app.busyAction === "issuePassport"}
-        onClick={() => void app.issueSamplePassport()}
-        type="button"
-      >
-        <IdCard aria-hidden size={18} />
-        <span>Issue Passport</span>
-      </button>
-      <button
-        className="flighttix-button secondary"
-        disabled={app.busyAction === "issueTicket"}
-        onClick={() => void app.issueSampleTicket()}
-        type="button"
-      >
-        <Ticket aria-hidden size={18} />
-        <span>Issue Ticket</span>
-      </button>
-      <div className="flighttix-button-row">
-        <button
-          className="flighttix-button secondary"
-          disabled={app.busyAction === "passportProof"}
-          onClick={() => void app.requestPassportProof()}
-          type="button"
-        >
-          <Send aria-hidden size={18} />
-          <span>Request Proof of Passport</span>
-        </button>
-        <button
-          className="flighttix-button secondary"
-          disabled={app.busyAction === "ticketProof"}
-          onClick={() => void app.requestTicketProof()}
-          type="button"
-        >
-          <Send aria-hidden size={18} />
-          <span>Request Proof of Ticket</span>
-        </button>
+      <div className="flighttix-dev-grid">
+        <section className="flighttix-dev-group">
+          <h3>Session</h3>
+          <div className="flighttix-dev-actions">
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "reset"}
+              onClick={() => void app.resetWallet()}
+              type="button"
+            >
+              <RotateCcw aria-hidden size={18} />
+              <span>Reset Wallet</span>
+            </button>
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "startup"}
+              onClick={() => void app.startWallet()}
+              type="button"
+            >
+              <Power aria-hidden size={18} />
+              <span>Start Up and Connect</span>
+            </button>
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "stop"}
+              onClick={() => void app.stopWallet()}
+              type="button"
+            >
+              <Power aria-hidden size={18} />
+              <span>Stop</span>
+            </button>
+          </div>
+        </section>
+
+        <section className="flighttix-dev-group">
+          <h3>Credentials</h3>
+          <div className="flighttix-dev-actions">
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "issuePassport"}
+              onClick={() => void app.issueSamplePassport()}
+              type="button"
+            >
+              <IdCard aria-hidden size={18} />
+              <span>Issue Passport</span>
+            </button>
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "issueTicket"}
+              onClick={() => void app.issueSampleTicket()}
+              type="button"
+            >
+              <Ticket aria-hidden size={18} />
+              <span>Issue Ticket</span>
+            </button>
+          </div>
+        </section>
+
+        <section className="flighttix-dev-group">
+          <h3>Proofs</h3>
+          <div className="flighttix-dev-actions">
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "passportProof"}
+              onClick={() => void app.requestPassportProof()}
+              type="button"
+            >
+              <Send aria-hidden size={18} />
+              <span>Request Proof of Passport</span>
+            </button>
+            <button
+              className="flighttix-button secondary"
+              disabled={app.busyAction === "ticketProof"}
+              onClick={() => void app.requestTicketProof()}
+              type="button"
+            >
+              <Send aria-hidden size={18} />
+              <span>Request Proof of Ticket</span>
+            </button>
+          </div>
+        </section>
       </div>
     </section>
   );
