@@ -7,12 +7,24 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "infra:bootstrap": "bash scripts/identus-infra.sh bootstrap",
+    "infra:start": "bash scripts/identus-infra.sh start",
+    "infra:health": "bash scripts/identus-infra.sh health",
+    "infra:stop": "bash scripts/identus-infra.sh stop"
   },
   "dependencies": {
+    "@hyperledger/identus-sdk": "^8.0.0",
+    "@types/elliptic": "^6.4.18",
+    "buffer": "^6.0.3",
+    "core-js": "^3.49.0",
+    "elliptic": "^6.6.1",
+    "jsdom": "^24.1.3",
+    "lucide-react": "^1.21.0",
     "next": "^16.2.9",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.1",

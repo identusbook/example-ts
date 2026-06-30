@@ -1,0 +1,673 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getFlights, getPresentation } from "@/features/identus/api";
+import { BrowserFlightTixWallet } from "@/features/identus/edge-agent";
+import type {
+  FlightTixWallet,
+  IdentusDebugLevel,
+  IdentusDebugLogEntry,
+  IdentusSnapshot,
+  Passport,
+  RegistrationInput,
+  SecurityPresentationRecord,
+  SecurityReviewStatus,
+  Ticket,
+} from "@/features/identus/types";
+import type { Flight } from "@/lib/flighttix/domain";
+
+export type FlightTixTab = "purchase" | "ticket" | "security" | "dev";
+export type FlightTixModal = "register" | "profile";
+export type FlightTixViewState = "loading" | "tabs";
+
+type BusyAction =
+  | "startup"
+  | "register"
+  | "purchase"
+  | "securityProof"
+  | "reset"
+  | "stop"
+  | "issuePassport"
+  | "issueTicket"
+  | "passportProof"
+  | "ticketProof";
+
+export interface RegisterFormInput {
+  name: string;
+  passportNumber: string;
+  dob: string;
+}
+
+export interface FlightTixController {
+  activeModal?: FlightTixModal;
+  activeTab: FlightTixTab;
+  busyAction?: BusyAction;
+  debugLog: IdentusDebugLogEntry[];
+  error?: string;
+  flights: Flight[];
+  message?: string;
+  passport?: Passport;
+  selectedFlight?: Flight;
+  selectedFlightId?: string;
+  securityPresentations: SecurityPresentationRecord[];
+  snapshot: IdentusSnapshot;
+  ticket?: Ticket;
+  viewState: FlightTixViewState;
+  closeModal: () => void;
+  issueSamplePassport: () => Promise<void>;
+  issueSampleTicket: () => Promise<void>;
+  openProfile: () => Promise<void>;
+  purchaseTicket: () => Promise<void>;
+  registerPassport: (input: RegisterFormInput) => Promise<void>;
+  reviewSecurityPresentation: (
+    presentationId: string,
+    reviewStatus: Extract<SecurityReviewStatus, "accepted" | "denied">,
+  ) => void;
+  requestPassportProof: () => Promise<void>;
+  requestTicketProof: () => Promise<void>;
+  resetWallet: () => Promise<void>;
+  selectFlight: (flightId: string) => void;
+  selectTab: (tab: FlightTixTab) => Promise<void>;
+  startWallet: () => Promise<void>;
+  stopWallet: () => Promise<void>;
+}
+
+const samplePassport: RegistrationInput = {
+  name: "Jon Bauer",
+  passportNumber: "12345",
+  dob: "1976-03-23T00:00:00.000Z",
+};
+
+const sampleTicket: Flight = {
+  id: "sfo-tyo-dev",
+  departure: "SFO",
+  arrival: "TYO",
+  price: 700,
+};
+
+const maxDebugLogEntries = 200;
+const actionTrace: Record<BusyAction, { start: string; success: string }> = {
+  startup: {
+    start: "Startup requested",
+    success: "Startup completed",
+  },
+  register: {
+    start: "Passport registration submitted",
+    success: "Passport registration completed",
+  },
+  purchase: {
+    start: "Ticket purchase requested",
+    success: "Ticket purchase completed",
+  },
+  securityProof: {
+    start: "Airport ticket proof requested",
+    success: "Airport ticket proof completed",
+  },
+  reset: {
+    start: "Wallet reset requested",
+    success: "Wallet reset completed",
+  },
+  stop: {
+    start: "Wallet stop requested",
+    success: "Wallet stopped",
+  },
+  issuePassport: {
+    start: "Sample passport issuance requested",
+    success: "Sample passport issuance completed",
+  },
+  issueTicket: {
+    start: "Sample ticket issuance requested",
+    success: "Sample ticket issuance completed",
+  },
+  passportProof: {
+    start: "Passport proof requested",
+    success: "Passport proof completed",
+  },
+  ticketProof: {
+    start: "Ticket proof requested",
+    success: "Ticket proof completed",
+  },
+};
+
+const tabLabels: Record<FlightTixTab, string> = {
+  purchase: "Purchase",
+  ticket: "Ticket",
+  security: "Airport Security",
+  dev: "Dev Utils",
+};
+
+export function useFlightTixApp(): FlightTixController {
+  const debugEntryIdRef = useRef(0);
+  const mountedRef = useRef(false);
+  const walletRef = useRef<FlightTixWallet | undefined>(undefined);
+  const [activeModal, setActiveModal] = useState<FlightTixModal>();
+  const [activeTab, setActiveTab] = useState<FlightTixTab>("purchase");
+  const [busyAction, setBusyAction] = useState<BusyAction>();
+  const [debugLog, setDebugLog] = useState<IdentusDebugLogEntry[]>([]);
+  const [error, setError] = useState<string>();
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [message, setMessage] = useState<string>();
+  const [passport, setPassport] = useState<Passport>();
+  const [selectedFlightId, setSelectedFlightId] = useState<string>();
+  const [securityPresentations, setSecurityPresentations] = useState<
+    SecurityPresentationRecord[]
+  >([]);
+  const [snapshot, setSnapshot] = useState<IdentusSnapshot>({
+    status: "disconnected",
+  });
+  const [ticket, setTicket] = useState<Ticket>();
+  const [viewState, setViewState] = useState<FlightTixViewState>("loading");
+
+  const selectedFlight = useMemo(
+    () =>
+      flights.find((flight) => flight.id === selectedFlightId) ?? flights[0],
+    [flights, selectedFlightId],
+  );
+
+  const appendDebugLog = useCallback(
+    (level: IdentusDebugLevel, message: string) => {
+      debugEntryIdRef.current += 1;
+      const entry: IdentusDebugLogEntry = {
+        id: debugEntryIdRef.current,
+        level,
+        message,
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugLog((current) => [...current, entry].slice(-maxDebugLogEntries));
+    },
+    [],
+  );
+
+  const handleSnapshot = useCallback(
+    (nextSnapshot: IdentusSnapshot) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setSnapshot(nextSnapshot);
+      if (nextSnapshot.debugEvent) {
+        appendDebugLog(
+          nextSnapshot.debugEvent.level,
+          nextSnapshot.debugEvent.message,
+        );
+      }
+    },
+    [appendDebugLog],
+  );
+
+  const wallet = useCallback((): FlightTixWallet => {
+    if (!walletRef.current) {
+      walletRef.current = new BrowserFlightTixWallet(handleSnapshot);
+    }
+
+    return walletRef.current;
+  }, [handleSnapshot]);
+
+  const refreshWalletData = useCallback(async () => {
+    const currentWallet = wallet();
+    const [nextPassport, nextTicket] = await Promise.all([
+      currentWallet.readPassport(),
+      currentWallet.readTicket(),
+    ]);
+    setPassport(nextPassport);
+    setTicket(nextTicket);
+    return { passport: nextPassport, ticket: nextTicket };
+  }, [wallet]);
+
+  const showRegisterIfNeeded = useCallback(async () => {
+    const loggedIn = await wallet().isLoggedIn();
+    if (!loggedIn) {
+      setActiveModal("register");
+    }
+    return loggedIn;
+  }, [wallet]);
+
+  const runAction = useCallback(
+    async (action: BusyAction, task: () => Promise<void>) => {
+      appendDebugLog("info", actionTrace[action].start);
+      setBusyAction(action);
+      setError(undefined);
+      setMessage(undefined);
+
+      try {
+        await task();
+        appendDebugLog("success", actionTrace[action].success);
+      } catch (caught) {
+        const nextError =
+          caught instanceof Error ? caught.message : "FlightTix action failed";
+        setError(nextError);
+        appendDebugLog("error", nextError);
+      } finally {
+        setBusyAction(undefined);
+      }
+    },
+    [appendDebugLog],
+  );
+
+  const updateSecurityPresentation = useCallback(
+    (presentationId: string, patch: Partial<SecurityPresentationRecord>) => {
+      setSecurityPresentations((current) =>
+        current.map((presentation) =>
+          presentation.id === presentationId
+            ? { ...presentation, ...patch }
+            : presentation,
+        ),
+      );
+    },
+    [],
+  );
+
+  const startWallet = useCallback(async () => {
+    await runAction("startup", async () => {
+      setViewState("loading");
+      const currentWallet = wallet();
+      await currentWallet.stop().catch(() => undefined);
+
+      const [catalog] = await Promise.all([
+        getFlights(),
+        currentWallet.start(),
+      ]);
+      setFlights(catalog);
+      setSelectedFlightId((current) => current ?? catalog[0]?.id);
+      await delay(2000);
+      await refreshWalletData();
+      setViewState("tabs");
+      await showRegisterIfNeeded();
+    });
+  }, [refreshWalletData, runAction, showRegisterIfNeeded, wallet]);
+
+  useEffect(() => {
+    let mounted = true;
+    mountedRef.current = true;
+
+    startWallet().finally(() => {
+      if (!mounted) {
+        walletRef.current?.stop().catch(() => undefined);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      mountedRef.current = false;
+      walletRef.current?.stop().catch(() => undefined);
+    };
+  }, [startWallet]);
+
+  const selectTab = useCallback(
+    async (tab: FlightTixTab) => {
+      setActiveTab(tab);
+      appendDebugLog("info", `Tab changed to ${tabLabels[tab]}`);
+      await refreshWalletData();
+      await showRegisterIfNeeded();
+    },
+    [appendDebugLog, refreshWalletData, showRegisterIfNeeded],
+  );
+
+  const selectFlight = useCallback(
+    (flightId: string) => {
+      const flight = flights.find((candidate) => candidate.id === flightId);
+      setSelectedFlightId(flightId);
+      appendDebugLog(
+        "info",
+        flight
+          ? `Flight selected ${flight.departure} to ${flight.arrival}`
+          : `Flight selected ${flightId}`,
+      );
+    },
+    [appendDebugLog, flights],
+  );
+
+  const openProfile = useCallback(async () => {
+    setActiveModal("profile");
+    await refreshWalletData();
+  }, [refreshWalletData]);
+
+  const closeModal = useCallback(() => {
+    setActiveModal(undefined);
+  }, []);
+
+  const registerPassport = useCallback(
+    async (input: RegisterFormInput) => {
+      const trimmedName = input.name.trim();
+      const trimmedPassportNumber = input.passportNumber.trim();
+
+      if (trimmedName.length <= 1 || trimmedPassportNumber.length <= 1) {
+        const nextError =
+          "Name and Passport Number must be longer than 1 character.";
+        setError(nextError);
+        appendDebugLog("error", nextError);
+        return;
+      }
+
+      await runAction("register", async () => {
+        const currentWallet = wallet();
+        await currentWallet.issuePassport({
+          name: trimmedName,
+          passportNumber: trimmedPassportNumber,
+          dob: dateInputToIso(input.dob),
+        });
+
+        const issuedPassport = await waitForCredential(() =>
+          currentWallet.readPassport(),
+        );
+        setPassport(issuedPassport);
+        await currentWallet.requestProof("passport");
+        await waitForWalletEvent(currentWallet, "Presentation sent");
+        await waitForLogin(currentWallet);
+        setActiveModal(undefined);
+        setMessage("Passport credential stored");
+      });
+    },
+    [appendDebugLog, runAction, wallet],
+  );
+
+  const purchaseTicket = useCallback(async () => {
+    if (!selectedFlight) {
+      const nextError = "No flight selected.";
+      setError(nextError);
+      appendDebugLog("error", nextError);
+      return;
+    }
+
+    await runAction("purchase", async () => {
+      const currentWallet = wallet();
+      await currentWallet.issueTicket(selectedFlight);
+      const issuedTicket = await waitForCredential(() =>
+        currentWallet.readTicket(),
+      );
+      setTicket(issuedTicket);
+      setMessage("Ticket credential stored");
+    });
+  }, [appendDebugLog, runAction, selectedFlight, wallet]);
+
+  const requestTicketProof = useCallback(async () => {
+    await runAction("securityProof", async () => {
+      const currentWallet = wallet();
+      const proofRequest = await currentWallet.requestProof("ticket");
+      const presentationId = proofRequest.presentation.presentationId;
+      const requestedPresentation: SecurityPresentationRecord = {
+        id: presentationId,
+        protocolStatus: proofRequest.presentation.status,
+        requestedAt: proofRequest.requestedAt,
+        requestedSchemaGuid: proofRequest.schemaGuid,
+        reviewStatus: "pending",
+        passportValid: false,
+        ticketValid: false,
+        threadId: proofRequest.presentation.thid,
+      };
+
+      setSecurityPresentations((current) => [
+        ...current,
+        requestedPresentation,
+      ]);
+      appendDebugLog(
+        "info",
+        `Airport presentation requested ${shortPresentationId(presentationId)}`,
+      );
+
+      const proofOutcome = await waitForProofOutcome(currentWallet);
+      const [nextPassport, nextTicket, passportLoginValid, protocolStatus] =
+        await Promise.all([
+          currentWallet.readPassport(),
+          currentWallet.readTicket(),
+          currentWallet.isLoggedIn(),
+          getPresentation(presentationId).catch(
+            () => proofRequest.presentation,
+          ),
+        ]);
+      const proofSent = proofOutcome === "sent";
+      const ticketValid = proofSent && Boolean(nextTicket);
+      const passportValid = Boolean(nextPassport) && passportLoginValid;
+
+      setPassport(nextPassport);
+      setTicket(nextTicket);
+      updateSecurityPresentation(presentationId, {
+        passportValid,
+        protocolStatus: protocolStatus.status,
+        proofSentAt: proofSent ? new Date().toISOString() : undefined,
+        reviewStatus: proofSent ? "pending" : "not-presented",
+        ticketValid,
+      });
+
+      if (proofSent) {
+        appendDebugLog(
+          "success",
+          `Ticket proof presented for ${shortPresentationId(presentationId)}`,
+        );
+        if (!passportValid) {
+          appendDebugLog(
+            "warning",
+            `Passport validity missing for ${shortPresentationId(presentationId)}`,
+          );
+        }
+        setMessage("Ticket proof presented");
+        return;
+      }
+
+      appendDebugLog(
+        "warning",
+        `Ticket proof not presented for ${shortPresentationId(presentationId)}`,
+      );
+      setMessage("Ticket proof not presented");
+    });
+  }, [appendDebugLog, runAction, updateSecurityPresentation, wallet]);
+
+  const reviewSecurityPresentation = useCallback(
+    (
+      presentationId: string,
+      reviewStatus: Extract<SecurityReviewStatus, "accepted" | "denied">,
+    ) => {
+      const reviewedAt = new Date().toISOString();
+      updateSecurityPresentation(presentationId, {
+        reviewedAt,
+        reviewStatus,
+      });
+      appendDebugLog(
+        reviewStatus === "accepted" ? "success" : "warning",
+        `Airport security ${reviewStatus} ${shortPresentationId(
+          presentationId,
+        )}`,
+      );
+      setError(undefined);
+      setMessage(
+        reviewStatus === "accepted"
+          ? "Presentation accepted"
+          : "Presentation denied",
+      );
+    },
+    [appendDebugLog, updateSecurityPresentation],
+  );
+
+  const requestPassportProof = useCallback(async () => {
+    await runAction("passportProof", async () => {
+      const currentWallet = wallet();
+      await currentWallet.requestProof("passport");
+      await waitForWalletEvent(currentWallet, "Presentation sent");
+      setMessage("Passport proof presented");
+    });
+  }, [runAction, wallet]);
+
+  const resetWallet = useCallback(async () => {
+    await runAction("reset", async () => {
+      await wallet().reset();
+      setPassport(undefined);
+      setTicket(undefined);
+      setSecurityPresentations([]);
+      setActiveModal("register");
+      setMessage("Wallet reset");
+    });
+  }, [runAction, wallet]);
+
+  const stopWallet = useCallback(async () => {
+    await runAction("stop", async () => {
+      await wallet().stop();
+      setMessage("Wallet stopped");
+    });
+  }, [runAction, wallet]);
+
+  const issueSamplePassport = useCallback(async () => {
+    await runAction("issuePassport", async () => {
+      const currentWallet = wallet();
+      await currentWallet.issuePassport(samplePassport);
+      const issuedPassport = await waitForCredential(() =>
+        currentWallet.readPassport(),
+      );
+      setPassport(issuedPassport);
+      await currentWallet.requestProof("passport");
+      await waitForWalletEvent(currentWallet, "Presentation sent");
+      setMessage("Sample passport credential stored");
+    });
+  }, [runAction, wallet]);
+
+  const issueSampleTicket = useCallback(async () => {
+    await runAction("issueTicket", async () => {
+      const currentWallet = wallet();
+      await currentWallet.issueTicket(sampleTicket);
+      const issuedTicket = await waitForCredential(() =>
+        currentWallet.readTicket(),
+      );
+      setTicket(issuedTicket);
+      await currentWallet.requestProof("ticket");
+      await waitForWalletEvent(currentWallet, "Presentation sent");
+      setMessage("Sample ticket credential stored");
+    });
+  }, [runAction, wallet]);
+
+  return {
+    activeModal,
+    activeTab,
+    busyAction,
+    debugLog,
+    error,
+    flights,
+    message,
+    passport,
+    selectedFlight,
+    selectedFlightId,
+    securityPresentations,
+    snapshot,
+    ticket,
+    viewState,
+    closeModal,
+    issueSamplePassport,
+    issueSampleTicket,
+    openProfile,
+    purchaseTicket,
+    registerPassport,
+    reviewSecurityPresentation,
+    requestPassportProof,
+    requestTicketProof,
+    resetWallet,
+    selectFlight,
+    selectTab,
+    startWallet,
+    stopWallet,
+  };
+}
+
+async function waitForCredential<T>(
+  readCredential: () => Promise<T | undefined>,
+): Promise<T> {
+  const credential = await poll(readCredential, 45_000, 2_500);
+  if (!credential) {
+    throw new Error("Credential was not stored before the timeout.");
+  }
+
+  return credential;
+}
+
+async function waitForLogin(wallet: FlightTixWallet): Promise<void> {
+  const loggedIn = await poll(() => wallet.isLoggedIn(), 20_000, 2_000);
+  if (!loggedIn) {
+    throw new Error("Passport credential did not satisfy login.");
+  }
+}
+
+async function waitForWalletEvent(
+  wallet: FlightTixWallet,
+  expectedEvent: string,
+): Promise<void> {
+  const completed = await poll(
+    () => {
+      const lastEvent = wallet.getSnapshot().lastEvent;
+      if (lastEvent === expectedEvent) {
+        return true;
+      }
+
+      if (lastEvent?.startsWith("No matching credential")) {
+        throw new Error(lastEvent);
+      }
+
+      return undefined;
+    },
+    20_000,
+    1_000,
+  );
+
+  if (!completed) {
+    throw new Error(`Wallet did not report "${expectedEvent}" before timeout.`);
+  }
+}
+
+async function waitForProofOutcome(
+  wallet: FlightTixWallet,
+): Promise<"sent" | "missing"> {
+  const outcome = await poll<"sent" | "missing">(
+    () => {
+      const lastEvent = wallet.getSnapshot().lastEvent;
+      if (lastEvent === "Presentation sent") {
+        return "sent";
+      }
+
+      if (lastEvent?.startsWith("No matching credential")) {
+        return "missing";
+      }
+
+      return undefined;
+    },
+    20_000,
+    1_000,
+  );
+
+  if (!outcome) {
+    throw new Error("Wallet did not answer the proof request before timeout.");
+  }
+
+  return outcome;
+}
+
+async function poll<T>(
+  action: () => T | undefined | false | Promise<T | undefined | false>,
+  timeoutMs: number,
+  intervalMs: number,
+): Promise<T | undefined> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const result = await action();
+    if (result) {
+      return result;
+    }
+
+    await delay(intervalMs);
+  }
+
+  return undefined;
+}
+
+function dateInputToIso(value: string): string {
+  return new Date(`${value}T00:00:00.000Z`).toISOString();
+}
+
+function shortPresentationId(presentationId: string): string {
+  if (presentationId.length <= 16) {
+    return presentationId;
+  }
+
+  return `${presentationId.slice(0, 8)}...${presentationId.slice(-4)}`;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}

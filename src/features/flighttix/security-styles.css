@@ -1,0 +1,215 @@
+.flighttix-security {
+  min-height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.flighttix-security-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.flighttix-security-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+}
+
+.flighttix-security-card.empty {
+  min-height: 120px;
+  align-content: center;
+}
+
+.flighttix-section-heading {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flighttix-section-heading h2,
+.flighttix-section-heading p,
+.flighttix-security-card.empty p,
+.flighttix-history-empty {
+  margin: 0;
+}
+
+.flighttix-section-heading h2 {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.flighttix-section-heading p,
+.flighttix-security-card.empty p,
+.flighttix-history-empty {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.flighttix-review-badge {
+  flex: 0 0 auto;
+  min-width: 96px;
+  padding: 5px 9px;
+  border: 1px solid #c8d1d9;
+  border-radius: 8px;
+  color: #243340;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.flighttix-review-badge.pending {
+  border-color: #f7c66f;
+  color: #7a4d00;
+}
+
+.flighttix-review-badge.accepted {
+  border-color: #9fd4c8;
+  color: var(--primary-strong);
+}
+
+.flighttix-review-badge.denied,
+.flighttix-review-badge.not-presented {
+  border-color: #fecdca;
+  color: var(--danger);
+}
+
+.flighttix-validity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.flighttix-validity-pill {
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #c8d1d9;
+  border-radius: 8px;
+  background: #f8fafb;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.flighttix-validity-pill.valid {
+  border-color: #9fd4c8;
+  background: #edf8f5;
+  color: var(--primary-strong);
+}
+
+.flighttix-validity-pill.invalid {
+  border-color: #fecdca;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.flighttix-proof-details {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.flighttix-proof-details div {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid #dce5e9;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.flighttix-proof-details dt {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.flighttix-proof-details dd {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.flighttix-security-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.flighttix-history-list {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.flighttix-history-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.85fr) minmax(120px, 0.8fr) minmax(
+      110px,
+      0.7fr
+    ) minmax(220px, 1.3fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  background: #f8fafb;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.flighttix-history-row time,
+.flighttix-history-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.flighttix-history-row time {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .flighttix-security-toolbar,
+  .flighttix-security-review-actions {
+    width: 100%;
+  }
+
+  .flighttix-security-card {
+    padding: 12px;
+  }
+
+  .flighttix-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .flighttix-review-badge {
+    width: 100%;
+  }
+
+  .flighttix-validity-grid,
+  .flighttix-proof-details,
+  .flighttix-history-row {
+    grid-template-columns: 1fr;
+  }
+}
